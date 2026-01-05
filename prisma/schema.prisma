@@ -1,0 +1,1580 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  role      String   @default("TENANT") // Valid values: TENANT, OWNER, AGENCY, ADMIN
+  password  String? // Hashed password for Credentials provider
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Auth Fields (NextAuth)
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  // Profile Fields
+  bio        String?
+  location   String?
+  website    String?
+  coverImage String?
+  links      String? // JSON string for social links { twitter, linkedin, instagram }
+  lastActive DateTime? @default(now())
+
+  // Phase 2 Expansion
+  statusMessage String?
+  isInvisible   Boolean @default(false)
+
+  // LinkedIn Fidelity Fields
+  company  String?
+  school   String?
+  industry String? // e.g. "Real Estate", "Tech"
+  headline String? // e.g. "Helping buyers find homes"
+
+  // Advanced Search Fields
+  availability String? // "OPEN_TO_WORK", "HIRING", "MENTORING", "BUSY"
+  isVerified   Boolean @default(false)
+
+  posts               Post[]
+  interactions        Interaction[]
+  comments            Comment[]
+  commentInteractions CommentInteraction[]
+
+  // Phase 5: Notifications & Reporting
+  notifications     Notification[] @relation("UserNotifications")
+  sentNotifications Notification[] @relation("NotificationSender")
+  reports           Report[]       @relation("Reporter")
+
+  followedBy Follow[] @relation("followedBy")
+  following  Follow[] @relation("following")
+
+  blockedUsers Block[] @relation("BlockedBy")
+  blockedBy    Block[] @relation("BlockedUsers")
+
+  collections Collection[] @relation("UserCollections")
+  savedPosts  SavedPost[]  @relation("UserSavedPosts")
+
+  notificationSettings NotificationSettings?
+  searchHistory        SearchHistory[]
+  legalConversations   LegalConversation[]
+
+  // Communities
+  createdCommunities   Community[]       @relation("CreatedCommunities")
+  communityMemberships CommunityMember[]
+  vibeReviews          VibeReview[]
+
+  // Gamification
+  reputation Int         @default(0)
+  badges     UserBadge[]
+
+  // Phase 11.6
+  pinnedPostId String?
+  pinnedPost   Post?   @relation("UserPinnedPost", fields: [pinnedPostId], references: [id])
+
+  // Phase 5: Messaging
+  conversations      ConversationParticipant[]
+  sentMessages       Message[]
+  messageStatus      MessageReadStatus[]
+  messageReactions   MessageReaction[]
+  ownedConversations Conversation[]            @relation("ConversationOwner")
+
+  // Phase 10: Real Estate Marketplace
+  listings        Listing[]        @relation("UserListings")
+  propertyReviews PropertyReview[] @relation("UserPropertyReviews")
+
+  // Phase 12: Tenant Dossier
+  tenantDossier TenantDossier?
+
+  // Phase 15: Owner Dashboard
+  properties  Property[]   @relation("UserProperties")
+  leases      Lease[]      @relation("UserLeases") // As Tenant
+  contractors Contractor[] @relation("OwnerContractors") // New
+
+  // Phase 20: P2P Lending
+  wallet             Wallet?
+  kycProfile         KYCProfile?
+  loanApplications   LoanProject[]       @relation("BorrowerLoans")
+  autoInvestSettings AutoInvestSettings?
+
+  // Social Collateral
+  sentVouches     SocialVouch[] @relation("VouchedBy")
+  receivedVouches SocialVouch[] @relation("VouchedFor")
+
+  // Phase 2: Stories
+  stories    Story[]
+  storyViews StoryView[]
+
+  reviewEligibilities ReviewEligibility[]
+
+  // Banking Security
+  twoFactorEnabled Boolean         @default(false)
+  twoFactorSecret  String? // Encrypted TOTP Secret
+  securityLogs     SecurityLog[]
+  beneficiaries    Beneficiary[]
+  linkedAccounts   LinkedAccount[]
+  complianceAlerts ComplianceAlert[]
+
+  // Referral System
+  referralCode String? @unique
+  referredById String?
+  referrer     User?   @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals    User[]  @relation("UserReferrals")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model SecurityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // LOGIN, WITHDRAWAL, CHANGE_IBAN, VIEW_PIN
+  status    String // SUCCESS, FAILED, BLOCKED
+  ipAddress String?
+  userAgent String?
+  metadata  String? // JSON details
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Beneficiary {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String // "Landlord", "Mom"
+  holder    String // Real name on account
+  iban      String
+  bic       String
+  status    String   @default("ACTIVE") // ACTIVE, ARCHIVED
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, iban])
+}
+
+model LinkedAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  providerId   String // "bnp", "revolut", "boursorama"
+  providerName String // "BNP Paribas", "Revolut"
+  accountName  String // "Compte Courant"
+  mask         String // "**** 1234"
+  balance      Float
+  currency     String   @default("EUR")
+  status       String   @default("ACTIVE") // ACTIVE, ERROR, SYNCING
+  lastSync     DateTime @default(now())
+
+  // Security
+  accessToken  String? // Encrypted in real app
+  refreshToken String? // Encrypted in real app
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[] // Synced transactions from this account
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Post {
+  id        String  @id @default(cuid())
+  content   String
+  image     String?
+  published Boolean @default(true)
+  authorId  String
+
+  type     String  @default("TEXT")
+  metadata String?
+  tags     String?
+  location String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author        User           @relation(fields: [authorId], references: [id])
+  interactions  Interaction[]
+  savedBy       SavedPost[]    @relation("PostSavedBy")
+  pinnedBy      User[]         @relation("UserPinnedPost")
+  comments      Comment[]
+  notifications Notification[]
+  hashtags      Hashtag[]
+
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id])
+
+  video      Video?
+  liveStream LiveStream?
+
+  // Phase 14.3 Publishing Options
+  scheduledAt   DateTime?
+  visibility    String    @default("PUBLIC") // PUBLIC, FRIENDS, UNLISTED
+  allowComments Boolean   @default(true)
+  allowDuets    Boolean   @default(true)
+  allowDownload Boolean   @default(true)
+  contentRating String    @default("CLEAN")
+  videoCategory String? // TIPS, TOURS, BEFORE_AFTER, TESTIMONIAL, QNA, FUN, NEWS, TUTORIAL, CHALLENGE, REACTION
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  type      String
+  value     String?
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId, type])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  postId    String
+  parentId  String?
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id])
+
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  children Comment[] @relation("CommentReplies")
+
+  // Phase 4+ Advanced Features
+  media     String?
+  isPinned  Boolean   @default(false)
+  isEdited  Boolean   @default(false)
+  isHidden  Boolean   @default(false)
+  deletedAt DateTime?
+  timestamp Float? // For video comments (seconds)
+
+  interactions  CommentInteraction[]
+  notifications Notification[]
+}
+
+model CommentInteraction {
+  id        String   @id @default(cuid())
+  type      String
+  value     String?
+  userId    String
+  commentId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  comment Comment @relation(fields: [commentId], references: [id])
+
+  @@unique([userId, commentId, type])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  isCloseFriend Boolean @default(false)
+  isMuted       Boolean @default(false)
+  type          String  @default("FOLLOWER") // FOLLOWER, FRIEND, NEIGHBOR, COLLEAGUE, WORK, FAMILY
+
+  follower  User @relation("following", fields: [followerId], references: [id])
+  following User @relation("followedBy", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("BlockedBy", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedUsers", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+// --- PHASE 5 MODELS ---
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String // LIKE, COMMENT, REPLY, MENTION, FOLLOW, SYSTEM
+  message   String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId String // Recipient
+  user   User   @relation("UserNotifications", fields: [userId], references: [id])
+
+  senderId String? // Triggered by
+  sender   User?   @relation("NotificationSender", fields: [senderId], references: [id])
+
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id])
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  reason    String // SPAM, HARASSMENT, MISINFO, OTHER
+  details   String?
+  status    String   @default("PENDING") // PENDING, RESOLVED, DISMISSED
+  createdAt DateTime @default(now())
+
+  reporterId String? // Optional (Anonymous)
+  reporter   User?   @relation("Reporter", fields: [reporterId], references: [id])
+
+  targetType String // POST, COMMENT, USER
+  targetId   String // ID of the target
+}
+
+model NotificationSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+
+  notifyOnLike    Boolean @default(true)
+  notifyOnComment Boolean @default(true)
+  notifyOnMention Boolean @default(true)
+  notifyOnFollow  Boolean @default(true)
+
+  // Phase 2 Expansion
+  readReceiptsEnabled Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+model Hashtag {
+  id        String   @id @default(cuid())
+  tag       String   @unique
+  createdAt DateTime @default(now())
+  posts     Post[]
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  query     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Community {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  image       String? // Logo/Avatar
+  coverImage  String?
+  type        String  @default("PUBLIC") // PUBLIC, PRIVATE, RESTRICTED, NEIGHBORHOOD
+  city        String?
+  zipCode     String?
+  category    String? // Tech, Art, Business...
+
+  rules String? // JSON or Text
+
+  creatorId String
+  creator   User   @relation("CreatedCommunities", fields: [creatorId], references: [id])
+
+  members     CommunityMember[]
+  posts       Post[]
+  vibeReviews VibeReview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VibeReview {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  safetyRating    Int // 1-5
+  noiseRating     Int // 1-5
+  transportRating Int // 1-5
+  comment         String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([communityId, userId])
+}
+
+model CommunityMember {
+  id          String   @id @default(cuid())
+  communityId String
+  userId      String
+  role        String   @default("MEMBER") // MEMBER, MODERATOR, ADMIN
+  joinedAt    DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+}
+
+model Badge {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique // e.g., "top-contributor", "expert"
+  icon        String // Lucide icon name or URL
+  description String
+  condition   String? // Description of how to earn it
+  category    String  @default("GENERAL") // GENERAL, COMMUNITY, PRO
+
+  users UserBadge[]
+
+  createdAt DateTime @default(now())
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+// --- PHASE 12 MODELS ---
+
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  isPublic    Boolean  @default(false)
+  type        String   @default("DEFAULT") // DEFAULT, READING_LIST
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User        @relation("UserCollections", fields: [userId], references: [id])
+  savedPosts SavedPost[] @relation("CollectionSavedPosts")
+}
+
+model SavedPost {
+  id           String   @id @default(cuid())
+  userId       String
+  postId       String
+  collectionId String?
+  progress     Float    @default(0.0) // 0.0 to 1.0
+  createdAt    DateTime @default(now())
+
+  user       User        @relation("UserSavedPosts", fields: [userId], references: [id])
+  post       Post        @relation("PostSavedBy", fields: [postId], references: [id])
+  collection Collection? @relation("CollectionSavedPosts", fields: [collectionId], references: [id])
+
+  @@unique([userId, postId, collectionId])
+}
+
+// --- PHASE 13 MODELS ---
+
+model Video {
+  id     String @id @default(cuid())
+  postId String @unique
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  url       String
+  thumbnail String?
+  duration  Float? // Seconds
+  format    String? // MP4, WEBM
+
+  views Int @default(0)
+
+  // Advanced Features
+  transcript String? // Text or URL
+  chapters   String? // JSON [{ start: 0, title: "Intro" }]
+
+  // Technical Metadata
+  resolution  String? // "1080p", "720p"
+  aspectRatio String? // "9:16", "16:9"
+  fps         Int? // 30, 60
+  codec       String? // "h264", "h265"
+}
+
+model LiveStream {
+  id     String @id @default(cuid())
+  postId String @unique
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  status    String    @default("LIVE") // LIVE, ENDED
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  peakViewers  Int     @default(0)
+  recordingUrl String?
+}
+
+// --- PHASE 2: STORIES (REAL) ---
+
+model Story {
+  id        String  @id @default(cuid())
+  userId    String
+  mediaUrl  String
+  mediaType String  @default("IMAGE") // IMAGE, VIDEO
+  caption   String?
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  views StoryView[]
+
+  @@index([userId])
+}
+
+model StoryView {
+  id       String   @id @default(cuid())
+  storyId  String
+  viewerId String
+  viewedAt DateTime @default(now())
+
+  story  Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer User  @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, viewerId])
+}
+
+// --- PHASE 5: MESSAGING MODELS ---
+
+model Conversation {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+
+  name        String? // For group chats & channels
+  description String? // For groups & channels
+  image       String? // Avatar
+  type        String  @default("DM") // DM, GROUP, CHANNEL_PUBLIC, CHANNEL_PRIVATE
+  isGroup     Boolean @default(false) // Keep for backward compatibility for now
+
+  // Phase 2 Expansion
+  category    String? // For Channels (e.g. "Real Estate", "Neighborhood")
+  permissions String? // JSON for granular permissions
+
+  slug       String? @unique // For public channels
+  isOfficial Boolean @default(false) // Verified/Official channels
+
+  ownerId String?
+  owner   User?   @relation("ConversationOwner", fields: [ownerId], references: [id])
+
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime  @default(now())
+  role           String    @default("MEMBER") // ADMIN, MODERATOR, MEMBER
+  lastReadAt     DateTime? // For unread count
+  lastSeenAt     DateTime? // For presence in group
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String  @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String?
+  image          String?
+  file           String?
+  audio          String?
+
+  type      String   @default("TEXT") // TEXT, IMAGE, AUDIO, VIDEO, FILE, SYSTEM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
+
+  isPinned Boolean @default(false)
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[] @relation("MessageReplies")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  readStatuses MessageReadStatus[]
+  reactions    MessageReaction[]
+  attachments  MessageAttachment[]
+  metadata     String? // JSON for Link Preview, Voice Duration, etc.
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  url       String
+  type      String // IMAGE, VIDEO, FILE, AUDIO
+  name      String?
+  size      Int? // Bytes
+  mimeType  String?
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model MessageReadStatus {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+// --- PHASE 10: REAL ESTATE MARKETPLACE MODELS ---
+
+model Listing {
+  id           String  @id @default(cuid())
+  title        String
+  description  String
+  price        Float
+  type         String  @default("RENT") // RENT, SALE
+  propertyType String  @default("APARTMENT") // APARTMENT, HOUSE, STUDIO, ROOM, OTHER
+  surface      Float // m²
+  rooms        Int // Number of rooms
+  bedrooms     Int? // Number of bedrooms
+  amenities    String? // JSON or CSV: "WIFI,PARKING,BALCONY"
+
+  // Technical Details
+  // surface removed (duplicate)
+  floor       Int?
+  totalFloors Int?
+  isFurnished Boolean @default(false)
+  heatingType String? // INDIVIDUAL, COLLECTIVE
+
+  // Energy
+  energyClass String? // A, B, C...
+  dpeValue    Int? // kWh/m²/year
+  gesValue    Int? // kgCO2/m²/year
+
+  // Financials
+  // price removed (duplicate)
+  charges Float? // Monthly charges
+  deposit Float? // Security deposit
+
+  // Availability
+  availabilityDate DateTime?
+
+  // Contact Info
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
+  virtualTourUrl String? // URL for Matterport or other 3D tour
+
+  // Location
+  address   String
+  latitude  Float
+  longitude Float
+
+  userId String
+  user   User   @relation("UserListings", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images       ListingImage[]
+  applications RentalApplication[]
+}
+
+model ListingImage {
+  id        String  @id @default(cuid())
+  url       String
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model PropertyReview {
+  id        String @id @default(cuid())
+  address   String
+  latitude  Float
+  longitude Float
+
+  rating  Int // Global 1-5 
+  comment String?
+  pros    String?
+  cons    String?
+
+  // --- 1. Confort & Santé ---
+  thermalScore    Int? // 1-5
+  acousticScore   Int? // 1-5
+  luminosityScore Int? // 1-5
+  humidityScore   Int? // 1-5 (5 = No humidity)
+
+  // --- 2. Bâtiment & Vie ---
+  commonAreasScore Int? // 1-5 (Propreté)
+  safetyScore      Int? // 1-5 (Sécurité Quartier)
+  transportScore   Int? // 1-5
+
+  // --- 3. Propriétaire ---
+  responsivenessScore Int? // 1-5
+  depositReturnScore  Int? // 1-5
+
+  // --- 4. Infra ---
+  networkScore Int? // 1-5
+
+  // --- 5. Rent Tracker ---
+  rentPaid Int? // Montant du loyer payé (CC)
+  rentYear Int? // Année de référence
+
+  // Context for Rent
+  surface     Float? // Pour calculer le prix au m²
+  isFurnished Boolean?
+
+  isVerifiedTenant Boolean @default(false)
+
+  userId String
+  user   User   @relation("UserPropertyReviews", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model ReviewEligibility {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+
+  // The Proof
+  proofDocumentUrl String? // Lease, Quittance, Attestation Notaire
+  proofType        String? // LEASE_END_ATTESTATION, AGENCY_RECEIPT
+
+  // Extracted Data (Verified by Admin/OCR)
+  address         String
+  moveInDate      DateTime?
+  moveOutDate     DateTime?
+  agencyName      String?
+  notaryReference String?
+
+  checkedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// --- PHASE 12: DIGITAL TENANT DOSSIER ---
+
+model TenantDossier {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status        String  @default("INCOMPLETE") // INCOMPLETE, COMPLETE, VERIFIED
+  description   String? // "Dossier Couple", "Dossier Etudiant"
+  videoPitchUrl String?
+
+  openBankingStatus String @default("NOT_CONNECTED") // NOT_CONNECTED, CONNECTED
+  verifiedIncome    Int?
+  solvencyScore     Int?
+
+  profile TenantProfile?
+
+  recommendations TenantRecommendation[]
+
+  groupId String?
+  group   DossierGroup? @relation(fields: [groupId], references: [id])
+
+  documents    DossierDocument[]
+  accesses     DossierAccess[]
+  guarantors   DossierGuarantor[]
+  applications RentalApplication[]
+  rentPayments RentPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TenantProfile {
+  id        String        @id @default(cuid())
+  dossierId String        @unique
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  // --- Professional ---
+  status         String? // CDI, CDD, FREELANCE, PUBLIC, STUDENT...
+  employer       String?
+  jobTitle       String?
+  contractType   String? // FULL_TIME, PART_TIME
+  startDate      DateTime? // For seniority
+  netIncome      Int? // Base net (manual declaration)
+  variableIncome Int? // Bonus/Commissions
+  taxReference   Int? // RFR N-1
+  linkedinUrl    String?
+  workMode       String? // REMOTE, HYBRID, ONSITE
+
+  // --- Personal ---
+  bio         String? // Pitch 140 chars
+  phone       String?
+  birthDate   DateTime?
+  nationality String?
+
+  // --- Lifestyle & Household ---
+  familyStatus  String? // SINGLE, COUPLE, FAMILY
+  childrenCount Int     @default(0)
+  pets          String? // JSON string or simple text: "Cat, quiet"
+  smoker        Boolean @default(false)
+  transport     String? // CAR, BIKE, PUBLIC, NONE
+
+  // --- Project ---
+  moveInDate     DateTime?
+  durationIntent String? // 1_YEAR, LONG_TERM, IDK
+  searchArea     String? // Preferred cities/arrondissements
+
+  // --- Rental History ---
+  currentStatus  String? // TENANT, OWNER, HOSTED
+  currentRent    Int?
+  currentAddress String?
+  reasonForMove  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TenantRecommendation {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  authorName  String
+  authorEmail String
+  authorRole  String // LANDLORD, AGENCY
+  rating      Int
+  comment     String
+  status      String @default("VERIFIED") // PENDING, VERIFIED
+
+  createdAt DateTime @default(now())
+}
+
+model RentPayment {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  month    DateTime // First day of the month
+  amount   Float
+  status   String   @default("PAID") // PAID, PENDING, LATE, MISSED
+  proofUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DossierGroup {
+  id   String @id @default(cuid())
+  name String
+  type String @default("COUPLE") // COUPLE, ROOMMATES
+
+  members TenantDossier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DossierDocument {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  guarantorId String?
+  guarantor   DossierGuarantor? @relation(fields: [guarantorId], references: [id], onDelete: Cascade)
+
+  type   String // ID_CARD, PAYSLIP, TAX_RETURN, PROOF_ADDRESS, EMPLOYMENT_CONTRACT, GUARANTOR_ID, ...
+  status String @default("PENDING") // PENDING, VALID, REJECTED
+
+  // File details
+  url      String
+  name     String
+  size     Int
+  mimeType String
+
+  // Watermarked version (auto-generated)
+  watermarkedUrl String?
+
+  createdAt DateTime @default(now())
+}
+
+model DossierAccess {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  recipientEmail String? // Invitation by email
+  viewerId       String? // If registered user (Agency/Owner)
+
+  token     String    @unique // For public link access
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  logs DossierAccessLog[]
+}
+
+model DossierAccessLog {
+  id       String        @id @default(cuid())
+  accessId String
+  access   DossierAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  ipAddress String?
+  userAgent String?
+  viewedAt  DateTime @default(now())
+}
+
+model DossierGuarantor {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  relation  String? // PARENT, FRIEND, COMPANY
+
+  status String  @default("PENDING") // PENDING, INVITED, COMPLETED
+  token  String? @unique // Access token for the guarantor to upload files
+
+  // Documents specifically for this guarantor
+  documents DossierDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RentalApplication {
+  id        String        @id @default(cuid())
+  dossierId String
+  dossier   TenantDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  // If simulated/external application
+  externalLabel String?
+
+  status String  @default("SENT") // SENT, OPENED, REVIEWING, ACCEPTED, REJECTED
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- PHASE 15: OWNER DASHBOARD MODELS ---
+
+model Property {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("UserProperties", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  title   String
+  address String
+  type    String
+  surface Float
+
+  // Financials
+  acquisitionPrice Float?
+  loanAmount       Float?
+  loanRate         Float? // Interest rate %
+  loanDuration     Int? // Months
+  fiscalMode       String @default("LMNP") // LMNP, SCI, FONCIER
+
+  leases    Lease[]
+  tickets   MaintenanceTicket[]
+  documents PropertyDocument[]
+  expenses  Expense[]
+  assets    PropertyAsset[]
+
+  imageUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  amount       Float
+  date         DateTime
+  category     String // TAX, MAINTENANCE, LOAN, INSURANCE, COPRO, OTHER
+  description  String?
+  isDeductible Boolean  @default(true)
+
+  // Recurrence
+  frequency     String    @default("ONCE") // ONCE, WEEKLY, MONTHLY, YEARLY
+  lastGenerated DateTime? // For recurring templates
+
+  attachmentUrl String? // Proof/Invoice
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lease {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  tenantName  String
+  tenantEmail String?
+
+  tenantId String?
+  tenant   User?   @relation("UserLeases", fields: [tenantId], references: [id])
+
+  startDate DateTime
+  endDate   DateTime?
+
+  rentAmount    Float
+  chargesAmount Float
+
+  status String @default("ACTIVE") // ACTIVE, NOTICE, ENDED
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  leaseId String
+  lease   Lease  @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  amount Float
+  date   DateTime @default(now())
+  status String   @default("PAID") // PAID, PENDING, LATE
+  type   String   @default("RENT") // RENT, DEPOSIT, CHARGES
+
+  frequency String @default("ONCE") // ONCE, MONTHLY
+
+  createdAt DateTime @default(now())
+}
+
+model MaintenanceTicket {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+  priority    String  @default("MEDIUM")
+  status      String  @default("OPEN")
+  category    String?
+
+  // Advanced Hub Features
+  provider     String? // Legacy (can be removed later or kept for non-linked pros)
+  contractorId String?
+  contractor   Contractor? @relation(fields: [contractorId], references: [id])
+
+  proContact    String? // Email or Phone
+  cost          Float? // Actual or estimated cost
+  scheduledDate DateTime? // Next intervention date
+
+  messages    TicketMessage[]
+  timeline    TicketEvent[]
+  attachments TicketAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TicketMessage {
+  id       String            @id @default(cuid())
+  ticketId String
+  ticket   MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  senderName String
+  senderRole String @default("OWNER") // OWNER, TENANT, SYSTEM, PROVIDER
+  content    String
+
+  isMe Boolean @default(false) // Helper for UI (computed usually, but stored for simplicity in MVP)
+
+  createdAt DateTime @default(now())
+}
+
+model TicketEvent {
+  id       String            @id @default(cuid())
+  ticketId String
+  ticket   MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  type        String // STATUS_CHANGE, COMMENT, ALERT, INTERVENTION
+  title       String
+  description String?
+
+  createdAt DateTime @default(now())
+}
+
+model TicketAttachment {
+  id       String            @id @default(cuid())
+  ticketId String
+  ticket   MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  name String
+  url  String
+  type String // IMAGE, DOCUMENT
+
+  createdAt DateTime @default(now())
+}
+
+model PropertyDocument {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  name String
+  url  String
+  type String // PDF, IMAGE, ETC
+
+  // Smart Metadata
+  category       String    @default("OTHER") // ACTE, DIAG, FACTURE, CONTRACT, INSURANCE
+  expirationDate DateTime?
+  tags           String? // JSON
+  fileSize       Int? // Bytes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- PHASE 16: MAINTENANCE EXTENSIONS ---
+
+model PropertyAsset {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  name String
+  type String // Heating, Plumbing, Roof, Paint...
+
+  installDate DateTime
+  lifespan    Int // In years
+  healthScore Int      @default(100) // 0-100
+  status      String   @default("GOOD") // GOOD, WARNING, CRITICAL
+
+  lastServiceDate DateTime?
+  nextServiceDate DateTime?
+
+  tasks MaintenanceTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaintenanceTask {
+  id      String        @id @default(cuid())
+  assetId String
+  asset   PropertyAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  title   String
+  dueDate DateTime
+  isDone  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model Contractor {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("OwnerContractors", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  jobType     String // Plumber, Electrician...
+  companyName String?
+
+  phone   String?
+  email   String?
+  website String?
+
+  rating     Float?
+  isVerified Boolean @default(false)
+
+  tickets MaintenanceTicket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- PHASE 15: LEGAL AI HISTORY ---
+
+model LegalConversation {
+  id        String         @id @default(cuid())
+  userId    String
+  title     String?        @default("Nouvelle Conversation")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  LegalMessage[]
+  updatedAt DateTime       @updatedAt
+  createdAt DateTime       @default(now())
+
+  @@index([userId])
+}
+
+model LegalMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   LegalConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "system"
+  content        String
+  createdAt      DateTime          @default(now())
+}
+
+// --- PHASE 20: P2P LENDING & BANKING ---
+
+model Wallet {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  balance  Float @default(0.0) // Available Cash
+  invested Float @default(0.0) // Locked in Loans
+  locked   Float @default(0.0) // Pending Allocation
+
+  currency String  @default("EUR")
+  iban     String? // Virtual IBAN
+
+  transactions Transaction[]
+  investments  Investment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // Core Financial Data
+  amount      Float
+  type        String // DEPOSIT, WITHDRAWAL, INVESTMENT, REPAYMENT_INTEREST, REPAYMENT_PRINCIPAL, FEE, TRANSFER_IN, TRANSFER_OUT
+  category    String @default("OTHER") // INVESTMENT, SALARY, SUBSCRIPTION, TRANSFER, FEE, INTEREST, REFUND, SHOPPING, UTILITIES, OTHER
+  status      String @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED, REVERSED
+  
+  // Reference & Tracking
+  reference       String?  // SEPA reference, internal ref, etc.
+  externalId      String?  // External provider transaction ID (Plaid, Stripe)
+  balanceAfter    Float?   // Wallet balance after this transaction (for statements)
+  
+  // Counterparty Information
+  counterpartyName  String?  // "Jean Dupont", "Netflix", "BNP Paribas"
+  counterpartyIban  String?  // For transfers
+  counterpartyLogo  String?  // URL for brand recognition
+  
+  // Linked Account (Plaid Integration)
+  linkedAccountId String?
+  linkedAccount   LinkedAccount? @relation(fields: [linkedAccountId], references: [id])
+  
+  // Compliance & Security (AML/KYC)
+  flagged           Boolean  @default(false)
+  flagReason        String?  // "HIGH_AMOUNT", "UNUSUAL_PATTERN", "COUNTRY_RISK"
+  complianceNotes   String?
+  reviewedBy        String?  // Admin user ID who reviewed
+  reviewedAt        DateTime?
+  
+  // Metadata & Enrichment
+  metadata    String? // JSON context (receipts, notes, tags)
+  description String? // User-friendly description
+  
+  // Recurring Detection
+  isRecurring     Boolean @default(false)
+  recurringGroupId String? // Groups recurring transactions together
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([walletId, createdAt])
+  @@index([category])
+  @@index([linkedAccountId])
+  @@index([flagged])
+}
+
+model KYCProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status    String @default("NOT_STARTED") // PENDING, VERIFIED, REJECTED, MORE_INFO_NEEDED
+  riskLevel String @default("MEDIUM") // LOW, MEDIUM, HIGH
+
+  documentType String? // PASSPORT, ID_CARD
+  documentUrl  String?
+  selfieUrl    String?
+
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LoanProject {
+  id String @id @default(cuid())
+
+  title       String
+  description String
+  amount      Float // Target Amount
+  funded      Float  @default(0.0)
+
+  duration  Int // Months
+  apr       Float // Annual Interest Rate
+  riskGrade String // A, B, C, D
+
+  status String @default("DRAFT") // DRAFT, REVIEW, FUNDING, ACTIVE, REPAID, DEFAULTED
+
+  borrowerId String
+  borrower   User   @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+
+  investments Investment[]
+  repayments  LoanRepayment[]
+
+  // Details
+  location    String?
+  projectType String? // REAL_ESTATE, BUSINESS, ECO
+  images      String? // JSON or separate relation
+  documents   String? // URLs to PDF
+
+  updates ProjectUpdate[] // News feed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Investment {
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+
+  loanId String
+  loan   LoanProject @relation(fields: [loanId], references: [id])
+
+  amount         Float
+  interestEarned Float @default(0.0)
+
+  status String @default("ACTIVE") // ACTIVE, COMPLETED, SOLD
+
+  signedContractUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LoanRepayment {
+  id     String      @id @default(cuid())
+  loanId String
+  loan   LoanProject @relation(fields: [loanId], references: [id])
+
+  dueDate   DateTime
+  amount    Float
+  principal Float
+  interest  Float
+
+  status String    @default("PENDING") // PENDING, PAID, LATE, MISSED
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model AutoInvestSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isEnabled     Boolean @default(false)
+  minInterest   Float   @default(5.0)
+  maxDuration   Int     @default(24) // Months
+  riskTolerance String // Stored as JSON or CSV e.g "A,B"
+  amountPerLoan Float   @default(50.0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectUpdate {
+  id String @id @default(cuid())
+
+  loanId String
+  loan   LoanProject @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  title    String
+  content  String
+  imageUrl String?
+
+  createdAt DateTime @default(now())
+}
+
+model SocialVouch {
+  id String @id @default(cuid())
+
+  voucherId String
+  voucher   User   @relation("VouchedBy", fields: [voucherId], references: [id])
+
+  targetId String
+  target   User   @relation("VouchedFor", fields: [targetId], references: [id])
+
+  relationship String @default("FRIEND") // FRIEND, FAMILY, COLLEAGUE
+
+  createdAt DateTime @default(now())
+
+  @@unique([voucherId, targetId])
+}
+
+// --- PHASE 21: COMPLIANCE & AUDIT ---
+
+model ComplianceAlert {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  transactionId String?
+  
+  type      String // HIGH_VOLUME, UNUSUAL_PATTERN, COUNTRY_RISK, PEP_MATCH, SANCTIONS_MATCH, VELOCITY
+  severity  String @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status    String @default("PENDING") // PENDING, REVIEWING, RESOLVED, ESCALATED, FALSE_POSITIVE
+  
+  title       String
+  description String
+  
+  // Resolution
+  resolvedBy    String?  // Admin user ID
+  resolvedAt    DateTime?
+  resolution    String?  // Action taken
+  
+  // SAR (Suspicious Activity Report) if needed
+  sarFiled      Boolean  @default(false)
+  sarReference  String?
+  sarFiledAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([severity])
+}
+
+model TransactionRule {
+  id String @id @default(cuid())
+  
+  // Rule Definition
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+  priority    Int     @default(0) // Higher = evaluated first
+  
+  // Matching Criteria (JSON for flexibility)
+  // e.g. {"counterpartyContains": "Netflix", "amountRange": [8, 20]}
+  criteria    String
+  
+  // Action
+  setCategory    String? // Category to assign
+  setDescription String? // Description template
+  setRecurring   Boolean? // Mark as recurring
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id       String @id @default(cuid())
+  userId   String // Who performed the action
+  
+  // Target
+  entityType String // TRANSACTION, USER, WALLET, COMPLIANCE_ALERT
+  entityId   String
+  
+  // Action
+  action      String // VIEW, CREATE, UPDATE, DELETE, FLAG, EXPORT, APPROVE, REJECT
+  changes     String? // JSON of before/after values
+  ipAddress   String?
+  userAgent   String?
+  
+  // Context
+  metadata    String? // Additional context in JSON
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
