@@ -1,5 +1,5 @@
 import { ReelsViewer } from "@/components/reels/ReelsViewer";
-import { Modal } from "@/components/ui/modal"; // We might need a Modal wrapper
+
 
 export default function ReelModal({ params }: { params: { id: string } }) {
     return (
