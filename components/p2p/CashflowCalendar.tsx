@@ -119,3 +119,4 @@ export function CashflowCalendar({ mode = 'widget' }: CashflowCalendarProps) {
         </Card>
     );
 }
+

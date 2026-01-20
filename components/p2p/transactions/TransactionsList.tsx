@@ -135,7 +135,7 @@ export function TransactionsList({
                 <Wallet className="mx-auto h-12 w-12 text-zinc-300 mb-4" />
                 <p className="text-zinc-500 mb-6 font-medium text-lg">Aucune transaction</p>
                 <p className="text-zinc-400 text-sm mb-6">Connectez un compte bancaire pour synchroniser vos transactions.</p>
-                <Link href="/p2p/wallet">
+                <Link href="/p2p/gains">
                     <Button>Connecter un compte</Button>
                 </Link>
             </div>
@@ -357,3 +357,4 @@ export function TransactionsList({
         </div>
     );
 }
+

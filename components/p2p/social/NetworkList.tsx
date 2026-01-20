@@ -71,3 +71,4 @@ function UserGrid({ users, emptyText }: { users: any[], emptyText: string }) {
         </div>
     );
 }
+

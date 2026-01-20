@@ -72,6 +72,20 @@ export function NotificationFeed({ userId }: NotificationFeedProps) {
             case "REPLY": return <MessageSquare className="h-5 w-5 text-blue-500" />;
             case "MENTION": return <AtSign className="h-5 w-5 text-orange-500" />;
             case "FOLLOW": return <UserPlus className="h-5 w-5 text-green-500" />;
+            // Smart notifications
+            case "PROFILE_VIEWS": return <span className="text-lg">👁️</span>;
+            case "POST_TRENDING": return <span className="text-lg">🔥</span>;
+            case "MILESTONE": return <span className="text-lg">🎉</span>;
+            case "WEEKLY_SUMMARY": return <span className="text-lg">📊</span>;
+            case "DAILY_DIGEST": return <span className="text-lg">📊</span>;
+            case "ENGAGEMENT_SPIKE": return <span className="text-lg">📈</span>;
+            case "NETWORK_GROWTH": return <span className="text-lg">🚀</span>;
+            case "SYSTEM_TIP": return <span className="text-lg">💡</span>;
+            case "ACHIEVEMENT": return <span className="text-lg">🏆</span>;
+            case "BEST_TIME": return <span className="text-lg">⏰</span>;
+            case "PROPERTY_INTEREST": return <span className="text-lg">🏠</span>;
+            case "PROPERTY_LEADS": return <span className="text-lg">📞</span>;
+            case "INACTIVE_REMINDER": return <span className="text-lg">👋</span>;
             default: return <Bell className="h-5 w-5 text-gray-500" />;
         }
     };
@@ -84,7 +98,50 @@ export function NotificationFeed({ userId }: NotificationFeedProps) {
             case "REPLY": return <span><span className="font-semibold">{sender}</span> a répondu : <span className="italic text-muted-foreground">"{n.message}"</span></span>;
             case "MENTION": return <span><span className="font-semibold">{sender}</span> vous a mentionné.</span>;
             case "FOLLOW": return <span><span className="font-semibold">{sender}</span> a commencé à vous suivre.</span>;
+            // Smart notifications - just display the message directly
+            case "PROFILE_VIEWS":
+            case "POST_TRENDING":
+            case "MILESTONE":
+            case "WEEKLY_SUMMARY":
+            case "DAILY_DIGEST":
+            case "ENGAGEMENT_SPIKE":
+            case "NETWORK_GROWTH":
+            case "SYSTEM_TIP":
+            case "ACHIEVEMENT":
+            case "BEST_TIME":
+            case "PROPERTY_INTEREST":
+            case "PROPERTY_LEADS":
+            case "INACTIVE_REMINDER":
+                return <span className="font-medium">{n.message}</span>;
             default: return <span>{n.message}</span>;
+        }
+    };
+
+    // Special styling for smart notifications
+    const getNotificationStyle = (type: string) => {
+        switch (type) {
+            case "POST_TRENDING":
+                return "bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-l-4 border-l-orange-500";
+            case "MILESTONE":
+            case "ACHIEVEMENT":
+                return "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-l-4 border-l-yellow-500";
+            case "WEEKLY_SUMMARY":
+            case "DAILY_DIGEST":
+                return "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-l-4 border-l-blue-500";
+            case "PROFILE_VIEWS":
+            case "ENGAGEMENT_SPIKE":
+            case "NETWORK_GROWTH":
+                return "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-l-4 border-l-green-500";
+            case "SYSTEM_TIP":
+            case "BEST_TIME":
+                return "bg-gradient-to-r from-purple-50 to-fuchsia-50 dark:from-purple-900/20 dark:to-fuchsia-900/20 border-l-4 border-l-purple-500";
+            case "PROPERTY_INTEREST":
+            case "PROPERTY_LEADS":
+                return "bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-900/20 dark:to-sky-900/20 border-l-4 border-l-cyan-500";
+            case "INACTIVE_REMINDER":
+                return "bg-gradient-to-r from-zinc-50 to-slate-50 dark:from-zinc-900/20 dark:to-slate-900/20 border-l-4 border-l-zinc-400";
+            default:
+                return "";
         }
     };
 
@@ -140,7 +197,8 @@ export function NotificationFeed({ userId }: NotificationFeedProps) {
                                             onClick={() => !n.read && handleMarkRead(n.id)}
                                             className={cn(
                                                 "relative flex gap-4 p-5 hover:bg-muted/40 transition-all border-b last:border-0 cursor-pointer group",
-                                                !n.read ? "bg-primary/5 hover:bg-primary/10" : ""
+                                                !n.read ? "bg-primary/5 hover:bg-primary/10" : "",
+                                                getNotificationStyle(n.type)
                                             )}
                                         >
                                             {/* Unread indicator dot */}
@@ -187,3 +245,4 @@ export function NotificationFeed({ userId }: NotificationFeedProps) {
         </div>
     );
 }
+

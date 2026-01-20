@@ -253,7 +253,7 @@ export async function syncTransactionsFromPlaid(linkedAccountId: string) {
         });
 
         revalidatePath("/p2p/portfolio");
-        revalidatePath("/p2p/wallet");
+        revalidatePath("/p2p/gains");
 
         return { success: true, synced, total: plaidTransactions.length };
 

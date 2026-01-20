@@ -73,3 +73,4 @@ export function NeighborhoodHeader({ community }: NeighborhoodHeaderProps) {
         </div>
     );
 }
+

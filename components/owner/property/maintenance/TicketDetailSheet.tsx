@@ -478,3 +478,4 @@ function ChatMessage({ sender, time, content, isMe }: any) {
         </div>
     )
 }
+

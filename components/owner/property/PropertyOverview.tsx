@@ -214,3 +214,4 @@ function QuickAction({ icon, label }: { icon: any, label: string }) {
         </button>
     )
 }
+

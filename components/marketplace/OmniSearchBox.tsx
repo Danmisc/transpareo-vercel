@@ -91,3 +91,4 @@ export function OmniSearchBox({ onSearch }: OmniSearchBoxProps) {
         </div>
     );
 }
+

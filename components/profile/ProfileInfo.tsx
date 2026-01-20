@@ -153,3 +153,4 @@ export function ProfileInfo({ user, isCurrentUser }: ProfileInfoProps) {
         </div>
     );
 }
+

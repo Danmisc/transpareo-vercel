@@ -228,3 +228,4 @@ export function DebtModule({ data }: { data: any }) {
         </div>
     );
 }
+

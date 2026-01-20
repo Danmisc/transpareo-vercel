@@ -12,7 +12,7 @@ import { SocialFeed } from "./SocialFeed";
 interface CommunityDashboardProps {
     data: {
         referralCode?: string | null;
-        reputation: number;
+        reputation?: number;
         trustScore: number;
         receivedVouches: any[];
         sentVouches: any[];
@@ -80,3 +80,4 @@ export function CommunityDashboard({ data }: CommunityDashboardProps) {
         </div>
     );
 }
+

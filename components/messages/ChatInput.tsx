@@ -405,3 +405,4 @@ export function ChatInput({ onSendMessage, triggerTyping, replyingTo, setReplyin
         </div>
     );
 }
+

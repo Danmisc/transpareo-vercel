@@ -167,3 +167,4 @@ export function LeaseViewer({ data, trigger }: LeaseViewerProps) {
         </Dialog>
     );
 }
+

@@ -40,3 +40,4 @@ export default function LocationMessage({ metadata }: { metadata: any }) {
         </div>
     );
 }
+

@@ -164,3 +164,4 @@ export function DossierSidebar({ activeTab, onTabChange }: DossierSidebarProps) 
         </>
     );
 }
+

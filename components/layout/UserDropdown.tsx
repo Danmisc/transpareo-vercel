@@ -11,13 +11,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { User, Settings, LogOut, HelpCircle, Moon, Sun, Laptop, Activity, Check } from "lucide-react";
+import { User, Settings, LogOut, HelpCircle, Moon, Sun, Laptop, Activity, Check, Crown, CreditCard } from "lucide-react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { StatusSettings } from "@/components/user/StatusSettings";
 import { SettingsDialog } from "@/components/user/SettingsDialog";
+import { useSubscription } from "@/hooks/use-subscription";
+import { PlanBadge } from "@/components/subscription/PlanBadge";
 
 function ThemeToggle() {
     const { setTheme, theme } = useTheme();
@@ -68,20 +71,38 @@ interface UserDropdownProps {
     };
 }
 
+import { CatAvatar, DEFAULT_CAT_TRAITS } from "@/components/profile/CatAvatar";
+
 export function UserDropdown({ user }: UserDropdownProps) {
     const [statusOpen, setStatusOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const avatarSrc = user.image || "/avatars/default.svg";
     const initials = user.name ? user.name[0].toUpperCase() : "U";
+
+    // Get current subscription plan
+    const { plan } = useSubscription();
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full ml-2">
-                    <Avatar className="h-8 w-8">
-                        <AvatarImage src={avatarSrc} alt={user.name || "User"} />
-                        <AvatarFallback>{initials}</AvatarFallback>
-                    </Avatar>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full ml-1 p-0 overflow-hidden focus-visible:ring-0 focus-visible:ring-offset-0">
+                    <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="h-full w-full rounded-full border border-zinc-200 dark:border-zinc-800 shadow-sm"
+                    >
+                        {user.image ? (
+                            <Avatar className="h-full w-full">
+                                <AvatarImage src={user.image} alt={user.name || "User"} />
+                                <AvatarFallback className="bg-gradient-to-br from-orange-100 to-amber-100 text-amber-700">
+                                    {initials}
+                                </AvatarFallback>
+                            </Avatar>
+                        ) : (
+                            <div className="h-full w-full">
+                                <CatAvatar traits={DEFAULT_CAT_TRAITS} size={36} className="w-full h-full" />
+                            </div>
+                        )}
+                    </motion.div>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -109,6 +130,15 @@ export function UserDropdown({ user }: UserDropdownProps) {
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Paramètres</span>
                     </DropdownMenuItem>
+                    <Link href="/settings/subscription">
+                        <DropdownMenuItem className="cursor-pointer justify-between">
+                            <span className="flex items-center">
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Mon Abonnement
+                            </span>
+                            <PlanBadge plan={plan} size="xs" showIcon={false} />
+                        </DropdownMenuItem>
+                    </Link>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
@@ -144,3 +174,4 @@ export function UserDropdown({ user }: UserDropdownProps) {
         </DropdownMenu>
     );
 }
+

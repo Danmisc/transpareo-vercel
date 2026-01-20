@@ -1,23 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useTransition } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Copy, Check, Send, Link as LinkIcon, Facebook, Twitter, Mail } from "lucide-react";
+import { Copy, Check, Send, Link as LinkIcon, Facebook, Twitter, Mail, Quote, Repeat2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { createPost } from "@/lib/actions";
+import { QuotedPostEmbed } from "./QuotedPostEmbed";
 
 interface ShareDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     postId: string;
-    postUrl: string; // Absolute URL to post
+    postUrl: string;
+    // For Quote feature
+    postContent?: string;
+    postAuthor?: {
+        name: string;
+        avatar?: string;
+        role?: string;
+    };
+    postCreatedAt?: Date;
+    postImage?: string;
+    currentUserId?: string;
 }
 
-export function ShareDialog({ open, onOpenChange, postId, postUrl }: ShareDialogProps) {
+export function ShareDialog({
+    open,
+    onOpenChange,
+    postId,
+    postUrl,
+    postContent,
+    postAuthor,
+    postCreatedAt,
+    postImage,
+    currentUserId
+}: ShareDialogProps) {
     const [copied, setCopied] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [quoteContent, setQuoteContent] = useState("");
+    const [isPending, startTransition] = useTransition();
+    const [activeTab, setActiveTab] = useState("link");
 
     const handleCopy = () => {
         navigator.clipboard.writeText(postUrl);
@@ -46,19 +72,64 @@ export function ShareDialog({ open, onOpenChange, postId, postUrl }: ShareDialog
         onOpenChange(false);
     };
 
+    const handleQuoteRepost = () => {
+        if (!currentUserId) {
+            toast.error("Connectez-vous pour citer ce post");
+            return;
+        }
+
+        startTransition(async () => {
+            // Create a new post with quotedPostId
+            const formData = new FormData();
+            formData.append("quotedPostId", postId);
+
+            const res = await createPost(
+                currentUserId,
+                quoteContent || "↩️",  // Default content if empty
+                "TEXT",
+                undefined,
+                { quotedPostId: postId },
+                undefined,
+                undefined,
+                formData
+            );
+
+            if (res.success) {
+                toast.success("Post cité avec succès !");
+                setQuoteContent("");
+                onOpenChange(false);
+            } else {
+                toast.error(res.error || "Erreur lors du partage");
+            }
+        });
+    };
+
+    const canQuote = currentUserId && postContent && postAuthor;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle>Partager ce post</DialogTitle>
+                    <DialogDescription>
+                        Partagez ce post avec vos amis ou citez-le avec votre commentaire.
+                    </DialogDescription>
                 </DialogHeader>
 
-                <Tabs defaultValue="link" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="link">Lien & Réseaux</TabsTrigger>
-                        <TabsTrigger value="dm">Message Privé</TabsTrigger>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="link" className="gap-1.5">
+                            <LinkIcon className="h-3.5 w-3.5" /> Lien
+                        </TabsTrigger>
+                        <TabsTrigger value="quote" className="gap-1.5" disabled={!canQuote}>
+                            <Quote className="h-3.5 w-3.5" /> Citer
+                        </TabsTrigger>
+                        <TabsTrigger value="dm" className="gap-1.5">
+                            <Send className="h-3.5 w-3.5" /> DM
+                        </TabsTrigger>
                     </TabsList>
 
+                    {/* Link & Social Tab */}
                     <TabsContent value="link" className="space-y-4 py-4">
                         <div className="flex space-x-2">
                             <Input value={postUrl} readOnly className="bg-muted" />
@@ -83,6 +154,54 @@ export function ShareDialog({ open, onOpenChange, postId, postUrl }: ShareDialog
                         </div>
                     </TabsContent>
 
+                    {/* Quote Tab */}
+                    <TabsContent value="quote" className="space-y-4 py-4">
+                        {canQuote && (
+                            <>
+                                <Textarea
+                                    placeholder="Ajoutez votre commentaire... (optionnel)"
+                                    value={quoteContent}
+                                    onChange={(e) => setQuoteContent(e.target.value)}
+                                    className="min-h-[80px] resize-none"
+                                    disabled={isPending}
+                                />
+
+                                {/* Preview of quoted post */}
+                                <div className="border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-2">
+                                    <p className="text-xs text-zinc-500 mb-1">Aperçu du post cité:</p>
+                                    <QuotedPostEmbed
+                                        post={{
+                                            id: postId,
+                                            content: postContent,
+                                            author: postAuthor,
+                                            createdAt: postCreatedAt || new Date(),
+                                            image: postImage
+                                        }}
+                                    />
+                                </div>
+
+                                <Button
+                                    onClick={handleQuoteRepost}
+                                    disabled={isPending}
+                                    className="w-full"
+                                >
+                                    {isPending ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            Publication...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Repeat2 className="h-4 w-4 mr-2" />
+                                            Citer ce post
+                                        </>
+                                    )}
+                                </Button>
+                            </>
+                        )}
+                    </TabsContent>
+
+                    {/* DM Tab */}
                     <TabsContent value="dm" className="space-y-4 py-4">
                         <div className="relative">
                             <Input
@@ -103,3 +222,4 @@ export function ShareDialog({ open, onOpenChange, postId, postUrl }: ShareDialog
         </Dialog>
     );
 }
+

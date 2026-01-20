@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default async function AutoInvestPage() {
     const user = await getCurrentUser();
-    if (!user) redirect("/auth/login");
+    if (!user) redirect("/login");
 
     const settings = await getAutoInvestSettings();
 
@@ -83,3 +83,4 @@ export default async function AutoInvestPage() {
         </div>
     );
 }
+

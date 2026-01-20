@@ -278,3 +278,4 @@ export function VideoPlayer({ src, poster, autoPlay = false, shouldPlay = false,
         </div>
     );
 }
+

@@ -145,3 +145,4 @@ export function TicketList({ tickets, onDelete, onViewDetail, onStatusChange }: 
         </div>
     );
 }
+

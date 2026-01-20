@@ -320,3 +320,4 @@ function PropertyCard({ property }: { property: any }) {
         </div>
     );
 }
+

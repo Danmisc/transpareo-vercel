@@ -95,3 +95,4 @@ export function ReportDialog({ open, onOpenChange, targetId, targetType, userId 
         </Dialog>
     );
 }
+

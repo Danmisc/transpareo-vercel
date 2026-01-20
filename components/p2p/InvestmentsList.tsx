@@ -125,3 +125,4 @@ export function InvestmentsList({ portfolio }: { portfolio: any[] }) {
         </div>
     );
 }
+

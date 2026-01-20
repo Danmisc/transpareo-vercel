@@ -39,3 +39,4 @@ export function LinkPreview({ metadata }: LinkPreviewProps) {
         </a>
     );
 }
+

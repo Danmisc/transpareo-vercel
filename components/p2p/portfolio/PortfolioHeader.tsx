@@ -52,3 +52,4 @@ export function PortfolioHeader({ portfolio }: { portfolio: any[] }) {
         </div>
     );
 }
+

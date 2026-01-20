@@ -353,3 +353,4 @@ export default function MarketplaceMap({ listings, reviews, viewState, viewMode 
         </div>
     );
 }
+

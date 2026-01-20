@@ -131,3 +131,4 @@ export function TransactionStats({ stats }: TransactionStatsProps) {
         </div>
     );
 }
+

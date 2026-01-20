@@ -110,3 +110,4 @@ function GraphNode({ node, delay }: { node: Node, delay: number }) {
         </motion.div>
     );
 }
+

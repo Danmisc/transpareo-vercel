@@ -170,3 +170,4 @@ export function RecommendationManager({ userId, recommendations }: Recommendatio
         </div>
     );
 }
+

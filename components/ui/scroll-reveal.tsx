@@ -38,3 +38,4 @@ export const ScrollReveal = ({ children, width = "fit-content", delay = 0, direc
         </div>
     );
 };
+

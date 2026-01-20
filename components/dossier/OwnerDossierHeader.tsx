@@ -32,7 +32,7 @@ export function OwnerDossierHeader({ user, score }: OwnerDossierHeaderProps) {
             {/* Avatar & Score */}
             <div className="relative shrink-0 flex flex-col items-center">
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white shadow-lg overflow-hidden relative z-10">
-                    <img src={user.image || "/avatars/default.png"} alt={user.name || "Candidat"} className="w-full h-full object-cover" />
+                    <img src={user.image || "/avatars/default.svg"} alt={user.name || "Candidat"} className="w-full h-full object-cover" />
                 </div>
                 <div className="absolute -bottom-3 z-20 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md flex items-center gap-1">
                     <ShieldCheck size={12} />
@@ -84,3 +84,4 @@ export function OwnerDossierHeader({ user, score }: OwnerDossierHeaderProps) {
         </div>
     );
 }
+

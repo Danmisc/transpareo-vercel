@@ -255,3 +255,4 @@ export function FilterDrawer({ filters, onFilterChange, trigger }: FilterDrawerP
         </Sheet>
     );
 }
+

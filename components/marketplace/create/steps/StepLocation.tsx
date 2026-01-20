@@ -124,3 +124,4 @@ export default function StepLocation({ data, update, onNext }: StepProps) {
         </div>
     );
 }
+

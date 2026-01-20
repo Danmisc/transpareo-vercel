@@ -109,3 +109,4 @@ export function ReviewEligibilityModal({ isOpen, onClose, onSubmit, address }: R
         </Dialog>
     );
 }
+

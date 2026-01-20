@@ -132,3 +132,4 @@ export function OwnerSidebar({ activeTab, onTabChange, user }: OwnerSidebarProps
         </div>
     );
 }
+

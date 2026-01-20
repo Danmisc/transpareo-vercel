@@ -39,3 +39,4 @@ export const NAV_CONFIG = {
         owner: { label: "Propriétaire", href: "/owner", icon: Crown },
     }
 };
+

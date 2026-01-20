@@ -68,3 +68,4 @@ function TrendingSkeleton() {
         </div>
     );
 }
+

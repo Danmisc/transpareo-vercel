@@ -78,3 +78,4 @@ export default function StepContact({ data, update, onNext }: StepProps) {
         </div>
     );
 }
+

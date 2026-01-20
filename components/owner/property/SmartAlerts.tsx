@@ -62,3 +62,4 @@ export function SmartAlerts({ data }: { data: any }) {
         </div>
     );
 }
+

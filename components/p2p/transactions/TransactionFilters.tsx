@@ -379,3 +379,4 @@ export function TransactionFilters({ onFiltersChange }: TransactionFiltersProps)
         </div>
     );
 }
+

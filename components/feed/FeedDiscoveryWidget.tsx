@@ -55,7 +55,7 @@ export function FeedDiscoveryWidget() {
                     {suggestions.map((user) => (
                         <div key={user.id} className="min-w-[140px] snap-center bg-white/50 dark:bg-black/20 rounded-lg p-3 flex flex-col items-center gap-2 border border-white/20">
                             <Avatar className="h-14 w-14 border-2 border-white dark:border-zinc-800">
-                                <AvatarImage src={user.avatar || "/avatars/default.png"} />
+                                <AvatarImage src={user.avatar || "/avatars/default.svg"} />
                                 <AvatarFallback>{user.name?.[0]}</AvatarFallback>
                             </Avatar>
                             <div className="text-center w-full">
@@ -82,3 +82,4 @@ export function FeedDiscoveryWidget() {
         </motion.div>
     );
 }
+

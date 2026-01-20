@@ -58,3 +58,4 @@ export function ListingList({ listings, loading, onRefresh, onFilterChange, onSe
         </div>
     );
 }
+

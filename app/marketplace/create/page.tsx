@@ -5,3 +5,4 @@ import { ListingCreationWizard } from "@/components/marketplace/create/ListingCr
 export default function CreateListingPage() {
     return <ListingCreationWizard />;
 }
+

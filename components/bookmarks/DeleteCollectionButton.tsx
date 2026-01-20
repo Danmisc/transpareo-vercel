@@ -51,3 +51,4 @@ export function DeleteCollectionButton({ collectionId }: { collectionId: string 
         </AlertDialog>
     );
 }
+

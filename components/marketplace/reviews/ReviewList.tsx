@@ -91,3 +91,4 @@ export function ReviewList({ mapBounds }: { mapBounds: any }) {
         </div>
     );
 }
+

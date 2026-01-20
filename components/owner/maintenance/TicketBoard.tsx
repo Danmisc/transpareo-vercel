@@ -186,3 +186,4 @@ function TicketCard({ ticket, onDelete, onPriorityChange, onViewDetail }: {
         </div>
     );
 }
+

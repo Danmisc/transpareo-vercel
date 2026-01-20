@@ -371,3 +371,4 @@ export function ListingDetails({ listing, similarListings = [] }: ListingDetails
         </div>
     );
 }
+

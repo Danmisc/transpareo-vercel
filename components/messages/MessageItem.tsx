@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Pencil, Trash2, X, Check, CheckCheck, SmilePlus, Reply, Info, Pin, Plus, File as FileIcon, Loader2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, X, Check, CheckCheck, SmilePlus, Reply, Info, Pin, Plus, File as FileIcon, Loader2, MessageSquare } from "lucide-react";
 import { deleteMessage, editMessage, toggleReaction } from "@/lib/services/messaging.service";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { useSession } from "next-auth/react";
@@ -38,9 +38,10 @@ interface MessageItemProps {
     onReply?: (message: any) => void;
     onPin?: (message: any) => void;
     onQuoteClick?: (messageId: string) => void;
+    onThread?: (message: any) => void;
 }
 
-export function MessageItem({ message, isMe, isSequence, onReply, onPin, onQuoteClick }: MessageItemProps) {
+export function MessageItem({ message, isMe, isSequence, onReply, onPin, onQuoteClick, onThread }: MessageItemProps) {
     const { data: session } = useSession();
     const [isEditing, setIsEditing] = useState(false);
 
@@ -168,6 +169,7 @@ export function MessageItem({ message, isMe, isSequence, onReply, onPin, onQuote
                             onInfo={() => setShowReadList(true)}
                             onPin={() => onPin?.(message)}
                             isPinned={message.isPinned}
+                            onThread={onThread ? () => onThread(message) : undefined}
                         />
                     </div>
                 )}
@@ -479,6 +481,21 @@ export function MessageItem({ message, isMe, isSequence, onReply, onPin, onQuote
                         <Pin size={10} className="text-orange-500 fill-orange-500 rotate-45" />
                     )}
                 </div>
+
+                {/* Thread Badge */}
+                {message.replies && message.replies.length > 0 && onThread && (
+                    <button
+                        onClick={() => onThread(message)}
+                        className={cn(
+                            "flex items-center gap-1.5 mt-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
+                            "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30",
+                            isMe ? "mr-1" : "ml-1"
+                        )}
+                    >
+                        <MessageSquare size={12} />
+                        <span>{message.replies.length} réponse{message.replies.length !== 1 ? "s" : ""}</span>
+                    </button>
+                )}
             </div>
 
             {/* Reactions Display Modal */}
@@ -492,7 +509,7 @@ export function MessageItem({ message, isMe, isSequence, onReply, onPin, onQuote
     );
 }
 
-function MessageActionsMenu({ onEdit, onDelete, onReply, onInfo, onPin, isPinned }: { onEdit: () => void, onDelete: () => void, onReply: () => void, onInfo: () => void, onPin: () => void, isPinned: boolean }) {
+function MessageActionsMenu({ onEdit, onDelete, onReply, onInfo, onPin, isPinned, onThread }: { onEdit: () => void, onDelete: () => void, onReply: () => void, onInfo: () => void, onPin: () => void, isPinned: boolean, onThread?: () => void }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -500,10 +517,15 @@ function MessageActionsMenu({ onEdit, onDelete, onReply, onInfo, onPin, isPinned
                     <MoreVertical size={14} />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuContent align="end" className="w-36">
                 <DropdownMenuItem onClick={onReply} className="gap-2 text-xs cursor-pointer">
                     <Reply size={12} /> Répondre
                 </DropdownMenuItem>
+                {onThread && (
+                    <DropdownMenuItem onClick={onThread} className="gap-2 text-xs cursor-pointer">
+                        <MessageSquare size={12} /> Ouvrir le fil
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={onPin} className="gap-2 text-xs cursor-pointer">
                     <Pin size={12} className={isPinned ? "fill-current" : ""} /> {isPinned ? "Désépingler" : "Épingler"}
                 </DropdownMenuItem>
@@ -520,3 +542,4 @@ function MessageActionsMenu({ onEdit, onDelete, onReply, onInfo, onPin, isPinned
         </DropdownMenu>
     );
 }
+

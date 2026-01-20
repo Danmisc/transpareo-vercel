@@ -179,6 +179,17 @@ export async function getMessages(conversationId: string, limit: number = 50) {
                         sender: { select: { name: true } }
                     }
                 },
+                replies: {
+                    select: {
+                        id: true,
+                        content: true,
+                        senderId: true,
+                        createdAt: true,
+                        sender: { select: { name: true, avatar: true } }
+                    },
+                    orderBy: { createdAt: 'asc' },
+                    take: 10
+                },
                 readStatuses: {
                     select: {
                         userId: true,
@@ -190,7 +201,8 @@ export async function getMessages(conversationId: string, limit: number = 50) {
                     include: {
                         user: { select: { id: true, name: true, avatar: true } }
                     }
-                }
+                },
+                attachments: true
             }
 
         });
@@ -218,6 +230,7 @@ import { SendMessageSchema, EditMessageSchema } from "@/lib/validations/messagin
 import { ratelimit } from "@/lib/redis";
 
 import { fetchMetadata } from "@/lib/metadata";
+import { canSendMessage, recordMessageSent } from "@/lib/subscription/feature-gates";
 
 // ... existing imports ...
 
@@ -232,6 +245,17 @@ export async function sendMessage(
     metadata?: any
 ) {
     try {
+        // 0. Check subscription message limit
+        const messageCheck = await canSendMessage(senderId);
+        if (!messageCheck.allowed) {
+            return {
+                success: false,
+                error: messageCheck.message || "Limite de messages quotidiens atteinte",
+                code: "MESSAGE_LIMIT_REACHED",
+                requiredPlan: messageCheck.requiredPlan
+            };
+        }
+
         // 1. Validation (Zod)
         const validation = SendMessageSchema.safeParse({
             conversationId,
@@ -303,6 +327,9 @@ export async function sendMessage(
 
         // Trigger Pusher Event
         await pusherServer.trigger(`private-conversation-${conversationId}`, "message:new", message);
+
+        // Track message usage for subscription limits
+        await recordMessageSent(senderId);
 
         return { success: true, data: message };
     } catch (error) {
@@ -643,10 +670,17 @@ export async function updateGroupPermissions(conversationId: string, permissions
 // --- USER & PRESENCE ---
 
 export async function updatePresence(userId: string) {
-    await prisma.user.update({
-        where: { id: userId },
-        data: { lastActive: new Date() }
-    });
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { lastActive: new Date() }
+        });
+    } catch (error) {
+        // Ignore "Record to update not found" errors as they are non-critical for presence
+        // and often occur with stale sessions or cached IDs.
+        if ((error as any).code === "P2025") return;
+        console.error("Failed to update presence:", error);
+    }
 }
 // --- USERS ---
 

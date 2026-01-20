@@ -104,3 +104,4 @@ export function DocumentVault({ documents, userId }: DocumentVaultProps) {
         </div>
     );
 }
+

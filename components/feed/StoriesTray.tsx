@@ -11,3 +11,4 @@ export async function StoriesTray() {
         <StoriesList initialStories={stories} />
     );
 }
+

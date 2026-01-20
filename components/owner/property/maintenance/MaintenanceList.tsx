@@ -78,3 +78,4 @@ export function MaintenanceList({ tickets, onTicketClick }: MaintenanceListProps
         </div>
     );
 }
+

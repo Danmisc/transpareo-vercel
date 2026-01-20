@@ -93,3 +93,4 @@ export function MaintenanceBoard({ tickets, onTicketClick }: MaintenanceBoardPro
         </div>
     );
 }
+

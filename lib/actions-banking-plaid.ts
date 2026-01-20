@@ -14,9 +14,9 @@ export async function createLinkToken() {
     const request: LinkTokenCreateRequest = {
         user: { client_user_id: user.id },
         client_name: 'Transpareo P2P',
-        products: [Products.Auth, Products.Transactions],
-        country_codes: [CountryCode.Fr, CountryCode.Us], // FR for local tests, US for Sandbox default
-        language: 'fr',
+        products: [Products.Auth, Products.Transactions], // Essentials for PFM & Auth
+        country_codes: [CountryCode.Us, CountryCode.Ca, CountryCode.Gb, CountryCode.Fr, CountryCode.Es, CountryCode.Ie, CountryCode.Nl, CountryCode.De], // Major Markets
+        language: 'fr', // Or dynamic based on user setttings
     };
 
     try {
@@ -61,7 +61,7 @@ export async function exchangePublicToken(publicToken: string, metadata: any) {
             }
         });
 
-        revalidatePath("/p2p/wallet");
+        revalidatePath("/p2p/gains");
         return { success: true };
     } catch (error) {
         console.error("Plaid Public Token Exchange Error:", error);

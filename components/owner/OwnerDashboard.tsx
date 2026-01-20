@@ -83,3 +83,4 @@ export function OwnerDashboard({ user, properties = [] }: OwnerDashboardProps) {
         </div>
     );
 }
+

@@ -48,3 +48,4 @@ export function SearchLayout({ sidebar, children }: SearchLayoutProps) {
         </div>
     );
 }
+

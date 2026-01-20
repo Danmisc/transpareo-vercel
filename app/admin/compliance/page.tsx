@@ -9,7 +9,7 @@ import { fr } from "date-fns/locale";
 
 export default async function CompliancePage() {
     const user = await getCurrentUser();
-    if (!user) redirect("/auth/login");
+    if (!user) redirect("/login");
 
     // Strict Admin Check (Mocking 'ADMIN' role check or specific email for now if role not consistent)
     // if (user.role !== "ADMIN") redirect("/"); 
@@ -127,3 +127,4 @@ export default async function CompliancePage() {
         </div>
     );
 }
+

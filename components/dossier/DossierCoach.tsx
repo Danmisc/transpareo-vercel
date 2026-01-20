@@ -130,3 +130,4 @@ export function DossierCoach({ dossierId, score, completion }: DossierCoachProps
         </Dialog>
     );
 }
+

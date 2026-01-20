@@ -1,22 +1,33 @@
 import { Header } from "@/components/layout/Header";
-import { getAllBadgesWithStatus } from "@/lib/gamification";
+import { getAllBadgesWithStatus, getUserLevel, LEVEL_INFO } from "@/lib/gamification";
 import { auth } from "@/lib/auth";
-import { DEMO_USER_ID } from "@/lib/constants";
 import * as Icons from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, Medal } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 
 export default async function BadgesPage() {
     const session = await auth();
-    const userId = session?.user?.id || DEMO_USER_ID;
 
-    const badges = await getAllBadgesWithStatus(userId) || []; // Default to empty array
-    const unlockedCount = badges.filter(b => b.isUnlocked).length;
-    const completionPercent = badges.length > 0 ? Math.round((unlockedCount / badges.length) * 100) : 0;
+    if (!session?.user?.id) {
+        redirect("/login");
+    }
+
+    const userId = session.user.id;
+
+    // Fetch badges and user level
+    const [badges, userLevel] = await Promise.all([
+        getAllBadgesWithStatus(userId),
+        getUserLevel(userId)
+    ]);
+
+    const allBadges = badges || [];
+    const unlockedCount = allBadges.filter((b: any) => b.isUnlocked).length;
+    const completionPercent = allBadges.length > 0 ? Math.round((unlockedCount / allBadges.length) * 100) : 0;
 
     return (
         <div className="min-h-screen bg-zinc-50/50 font-sans pb-20">
@@ -46,7 +57,7 @@ export default async function BadgesPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {badges.map((badge) => {
+                    {allBadges.map((badge: any) => {
                         const IconComponent = (Icons as any)[badge.icon] || Icons.Award;
                         const isUnlocked = badge.isUnlocked;
 
@@ -83,7 +94,7 @@ export default async function BadgesPage() {
                                 <div className="mt-auto pt-4 border-t w-full border-dashed border-border/50">
                                     {isUnlocked ? (
                                         <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                                            Obtenu le {new Date(badge.unlockedAt).toLocaleDateString()}
+                                            Obtenu le {badge.unlockedAt ? new Date(badge.unlockedAt).toLocaleDateString() : "récemment"}
                                         </span>
                                     ) : (
                                         <div className="text-xs font-semibold text-primary/80 bg-primary/5 px-3 py-1.5 rounded-md inline-block">
@@ -99,3 +110,4 @@ export default async function BadgesPage() {
         </div>
     );
 }
+

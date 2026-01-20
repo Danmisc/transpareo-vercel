@@ -7,15 +7,16 @@ import { Calendar, Clock, Plus, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CreditScoreCard } from "@/components/p2p/borrower/CreditScoreCard";
 
-export function BorrowerOverview({ loans }: { loans: any[] }) {
-    // Mock Credit Score
-    const creditScore = 780;
+export function BorrowerOverview({ loans, requests, creditScore }: { loans: any[], requests?: any[], creditScore?: number }) {
+    // Default to a seeding score if not provided
+    const score = creditScore || 720;
+    const allItems = [...(requests || []).map(r => ({ ...r, type: 'REQUEST' })), ...loans.map(l => ({ ...l, type: 'LOAN' }))];
 
     return (
         <div className="space-y-8">
             <div className="grid md:grid-cols-2 gap-8">
                 {/* 1. Credit Score Panel */}
-                <CreditScoreCard score={creditScore} />
+                <CreditScoreCard score={score} />
 
                 {/* 2. New Application CTA */}
                 <Card className="bg-zinc-900 border-zinc-800 text-white flex flex-col justify-center relative overflow-hidden group">
@@ -23,11 +24,11 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
                     <CardContent className="p-8">
                         <h3 className="text-xl font-bold mb-2">Un projet à financer ?</h3>
                         <p className="text-zinc-400 mb-6 text-sm">
-                            Obtenez jusqu'à 50 000 € en moins de 48h. Taux à partir de 2.9%.
+                            Obtenez jusqu'à 50 000 € en moins de 48h. Réponse immédiate.
                         </p>
-                        <Link href="/p2p/borrow">
+                        <Link href="/p2p/borrow/new">
                             <Button className="w-full bg-white text-black hover:bg-zinc-200 font-bold">
-                                <Plus size={16} className="mr-2" /> Nouvelle demande
+                                <Plus size={16} className="mr-2" /> Démarrer une demande
                             </Button>
                         </Link>
                     </CardContent>
@@ -37,11 +38,11 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
             {/* 3. Active Loans Section */}
             <div>
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Mes Emprunts</h3>
-                    {loans.length > 0 && <span className="text-sm text-zinc-500">{loans.length} actifs</span>}
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Mes Dossiers</h3>
+                    {allItems.length > 0 && <span className="text-sm text-zinc-500">{allItems.length} actifs</span>}
                 </div>
 
-                {loans.length === 0 ? (
+                {allItems.length === 0 ? (
                     <Card className="border-dashed border-2 border-zinc-200 dark:border-zinc-800 bg-transparent text-center py-12">
                         <Clock className="w-12 h-12 mx-auto text-zinc-300 mb-4" />
                         <p className="text-zinc-500 mb-2">Vous n'avez aucun emprunt en cours.</p>
@@ -49,25 +50,27 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
                     </Card>
                 ) : (
                     <div className="space-y-4">
-                        {loans.map(loan => (
-                            <Card key={loan.id} className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-white/10 transition-all hover:border-zinc-300 dark:hover:border-white/20">
+                        {allItems.map(item => (
+                            <Card key={item.id} className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-white/10 transition-all hover:border-zinc-300 dark:hover:border-white/20">
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <div className="flex items-center gap-3">
                                         <div className="h-10 w-10 bg-zinc-100 dark:bg-white/5 rounded-lg flex items-center justify-center font-bold text-zinc-500">
-                                            {loan.projectType === 'REAL_ESTATE' ? '🏠' : '💼'}
+                                            {(item.category === 'REAL_ESTATE' || item.projectType === 'REAL_ESTATE') ? '🏠' :
+                                                (item.category === 'VEHICLE' || item.projectType === 'VEHICLE') ? '🚗' : '💼'}
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-bold text-zinc-900 dark:text-zinc-200">
-                                                {loan.title}
+                                                {item.reason || item.title || "Projet"}
                                             </CardTitle>
-                                            <p className="text-xs text-zinc-500">N° {loan.id.slice(-8).toUpperCase()}</p>
+                                            <p className="text-xs text-zinc-500">N° {item.id.slice(-8).toUpperCase()}</p>
                                         </div>
                                     </div>
-                                    <Badge className={`${loan.status === 'FUNDING' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                                        loan.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
-                                            'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                    <Badge className={`${item.status === 'FUNDING' ? 'bg-blue-100 text-blue-700' :
+                                        item.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
+                                            item.status === 'PENDING' ? 'bg-zinc-100 text-zinc-600' :
+                                                'bg-amber-100 text-amber-700'
                                         } border-none`}>
-                                        {loan.status}
+                                        {item.status === 'PENDING' ? 'EN ANALYSE' : item.status}
                                     </Badge>
                                 </CardHeader>
                                 <CardContent>
@@ -75,21 +78,24 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
                                         <div>
                                             <p className="text-xs text-zinc-500 uppercase font-bold">Montant</p>
                                             <p className="text-lg font-bold font-mono text-zinc-900 dark:text-white">
-                                                {loan.amount.toLocaleString()} €
+                                                {item.amount.toLocaleString()} €
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-zinc-500 uppercase font-bold">Restant Dû</p>
+                                            <p className="text-xs text-zinc-500 uppercase font-bold">
+                                                {item.type === 'REQUEST' ? 'Durée' : 'Restant Dû'}
+                                            </p>
                                             <p className="text-lg font-bold font-mono text-zinc-900 dark:text-white">
-                                                {/* Mock Remaining: 80% if Active, 100% if Funding */}
-                                                {(loan.status === 'ACTIVE' ? loan.amount * 0.8 : loan.amount).toLocaleString()} €
+                                                {item.type === 'REQUEST' ? `${item.duration} mois` :
+                                                    (item.status === 'ACTIVE' ? item.amount * 0.8 : item.amount).toLocaleString() + ' €'}
                                             </p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-zinc-500 uppercase font-bold">Prochaine Échéance</p>
                                             <div className="flex items-center gap-1 font-medium text-orange-600">
                                                 <Calendar size={14} />
-                                                {loan.repayments?.[0] ? new Date(loan.repayments[0].dueDate).toLocaleDateString() : '--/--'}
+                                                {item.repayments?.[0] ? new Date(item.repayments[0].dueDate).toLocaleDateString() :
+                                                    item.type === 'REQUEST' ? 'En attente' : '--/--'}
                                             </div>
                                         </div>
                                         <div className="flex items-end justify-end">
@@ -99,10 +105,10 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
                                         </div>
                                     </div>
 
-                                    {loan.status === 'REVIEW' && (
-                                        <div className="mt-4 bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg flex gap-3 text-sm text-amber-800 dark:text-amber-400">
+                                    {item.status === 'PENDING' && (
+                                        <div className="mt-4 bg-zinc-50 dark:bg-white/5 p-3 rounded-lg flex gap-3 text-sm text-zinc-500">
                                             <Clock size={18} className="shrink-0" />
-                                            <p>Dossier en cours d'analyse par nos experts. Réponse sous 48h.</p>
+                                            <p>Votre demande est en cours d'analyse. Vous recevrez une notification dès que notre algorithme aura validé votre dossier.</p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -114,3 +120,4 @@ export function BorrowerOverview({ loans }: { loans: any[] }) {
         </div>
     );
 }
+

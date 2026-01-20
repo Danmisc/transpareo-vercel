@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Grid, Image, Heart, MessageSquare, Bookmark, BookOpen } from "lucide-react";
+import { Grid, Image, Heart, MessageSquare, Bookmark, BookOpen, User, Briefcase } from "lucide-react";
 
 interface ProfileTabsProps {
     defaultValue?: string;
@@ -23,6 +23,20 @@ export function ProfileTabs({ defaultValue = "posts", children }: ProfileTabsPro
                     Publications
                 </TabsTrigger>
                 <TabsTrigger
+                    value="about"
+                    className="flex-shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 font-medium text-muted-foreground data-[state=active]:text-foreground transition-all"
+                >
+                    <User className="h-4 w-4 mr-2" />
+                    À propos
+                </TabsTrigger>
+                <TabsTrigger
+                    value="portfolio"
+                    className="flex-shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 font-medium text-muted-foreground data-[state=active]:text-foreground transition-all"
+                >
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    Portfolio
+                </TabsTrigger>
+                <TabsTrigger
                     value="media"
                     className="flex-shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 font-medium text-muted-foreground data-[state=active]:text-foreground transition-all"
                 >
@@ -36,15 +50,10 @@ export function ProfileTabs({ defaultValue = "posts", children }: ProfileTabsPro
                     <Heart className="h-4 w-4 mr-2" />
                     J'aime
                 </TabsTrigger>
-                <TabsTrigger
-                    value="collections"
-                    className="flex-shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 font-medium text-muted-foreground data-[state=active]:text-foreground transition-all"
-                >
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Collections
-                </TabsTrigger>
             </TabsList>
             {children}
         </Tabs>
     );
 }
+
+

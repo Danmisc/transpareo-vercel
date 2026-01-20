@@ -78,3 +78,4 @@ export function CreditScoreCard({ score }: { score: number }) {
         </Card>
     );
 }
+

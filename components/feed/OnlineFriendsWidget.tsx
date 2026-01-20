@@ -80,7 +80,7 @@ export function OnlineFriendsWidget() {
                         >
                             <Link href={`/profile/${user.id}`}>
                                 <Avatar className="h-10 w-10 border-2 border-white dark:border-zinc-800 ring-2 ring-emerald-500/30">
-                                    <AvatarImage src={user.avatar || "/avatars/default.png"} />
+                                    <AvatarImage src={user.avatar || "/avatars/default.svg"} />
                                     <AvatarFallback>{user.name?.[0]}</AvatarFallback>
                                 </Avatar>
                                 <div className="absolute -bottom-1 -right-0.5 h-3.5 w-3.5 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full"></div>
@@ -92,3 +92,4 @@ export function OnlineFriendsWidget() {
         </div>
     );
 }
+

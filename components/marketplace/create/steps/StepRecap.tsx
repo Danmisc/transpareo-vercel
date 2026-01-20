@@ -77,3 +77,4 @@ export default function StepRecap({ data, onSubmit, isSubmitting }: StepProps) {
         </div>
     );
 }
+

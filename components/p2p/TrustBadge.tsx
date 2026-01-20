@@ -62,3 +62,4 @@ export function TrustBadge({ trustData, targetUserId, currentUserId }: TrustBadg
         </div>
     );
 }
+

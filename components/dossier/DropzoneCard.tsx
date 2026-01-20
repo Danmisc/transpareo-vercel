@@ -151,3 +151,4 @@ export function DropzoneCard({ type, label, icon: Icon, currentDoc, userId }: Dr
         </div>
     );
 }
+

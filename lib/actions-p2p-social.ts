@@ -3,6 +3,31 @@
 import { prisma as db } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { logSecurityEvent } from "@/lib/security";
+import crypto from "crypto";
+
+// ========================================
+// RATE LIMITING - Production Security
+// ========================================
+
+const socialRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+    const now = Date.now();
+    const limit = socialRateLimits.get(key);
+
+    if (limit) {
+        if (now < limit.resetAt) {
+            if (limit.count >= maxRequests) return false;
+            limit.count++;
+        } else {
+            socialRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+        }
+    } else {
+        socialRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    }
+    return true;
+}
 
 // --- PROJECT UPDATES ---
 
@@ -14,6 +39,11 @@ export async function postProjectUpdate(data: {
 }) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Unauthorized");
+
+    // Rate limit: 5 updates per day
+    if (!checkRateLimit(`update:${user.id}`, 5, 86400000)) {
+        throw new Error("Trop de mises à jour. Réessayez demain.");
+    }
 
     // Verify ownership
     const loan = await db.loanProject.findUnique({ where: { id: data.loanId } });
@@ -30,6 +60,7 @@ export async function postProjectUpdate(data: {
         }
     });
 
+    await logSecurityEvent(user.id, "PROJECT_UPDATE_POSTED", "SUCCESS", { loanId: data.loanId });
     revalidatePath(`/p2p/market/${data.loanId}`);
     return { success: true };
 }
@@ -41,6 +72,12 @@ export async function vouchForUser(targetUserId: string, relationship: "FRIEND" 
     if (!user) throw new Error("Unauthorized");
 
     if (user.id === targetUserId) throw new Error("Cannot vouch for yourself.");
+
+    // Rate limit: 5 vouches per day
+    if (!checkRateLimit(`vouch:${user.id}`, 5, 86400000)) {
+        await logSecurityEvent(user.id, "VOUCH_RATE_LIMITED", "FAILURE", { targetUserId });
+        throw new Error("Limite atteinte: 5 recommandations par jour maximum.");
+    }
 
     // Check existing vouch
     const existing = await db.socialVouch.findUnique({
@@ -62,7 +99,8 @@ export async function vouchForUser(targetUserId: string, relationship: "FRIEND" 
         }
     });
 
-    revalidatePath(`/p2p/profile/${targetUserId}`); // Assuming future profile page
+    await logSecurityEvent(user.id, "VOUCH_CREATED", "SUCCESS", { targetUserId, relationship });
+    revalidatePath(`/p2p/profile/${targetUserId}`);
     return { success: true };
 }
 
@@ -100,8 +138,13 @@ export async function generateReferralCode() {
 
     if (existing?.referralCode) return { code: existing.referralCode };
 
-    // Generate new code: Name + 4 random digits
-    const code = (user.name?.slice(0, 4).toUpperCase() || "USER") + Math.floor(1000 + Math.random() * 9000);
+    // Generate cryptographically secure code: 8 alphanumeric characters
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars: I, O, 0, 1
+    let code = '';
+    const randomBytes = crypto.randomBytes(8);
+    for (let i = 0; i < 8; i++) {
+        code += chars[randomBytes[i] % chars.length];
+    }
 
     // Update user
     await db.user.update({

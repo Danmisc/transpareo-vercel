@@ -21,6 +21,7 @@ import { usePresence } from "@/components/providers/PresenceProvider";
 import { MessageItem } from "@/components/messages/MessageItem";
 import { ChatInput } from "@/components/messages/ChatInput";
 import { SharedMediaSheet } from "../conversation/SharedMediaSheet";
+import { ThreadView } from "./ThreadView";
 
 export default function ChatWindow({ conversationId }: { conversationId: string }) {
     const { data: session } = useSession();
@@ -34,6 +35,7 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
     const [showMediaSheet, setShowMediaSheet] = useState(false);
+    const [threadMessage, setThreadMessage] = useState<any>(null);
 
     // Initial Load
     useEffect(() => {
@@ -51,7 +53,9 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
                 const mapMessage = (m: any) => ({
                     id: m.id,
                     sender: m.senderId === session?.user?.id ? "me" : "other",
+                    senderId: m.senderId,
                     senderName: m.sender.name,
+                    senderAvatar: m.sender.avatar || m.sender.image,
                     content: m.content,
                     time: new Date(m.createdAt),
                     type: m.type === "IMAGE" ? "image" : "text",
@@ -63,7 +67,10 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
                     reactions: m.reactions || [],
                     attachments: m.attachments || [],
                     replyTo: m.replyTo,
-                    isPinned: m.isPinned
+                    replyToId: m.replyToId,
+                    isPinned: m.isPinned,
+                    replies: m.replies || [],
+                    conversationId: conversationId
                 });
                 const mapped = msgsRes.data.map(mapMessage);
                 setMessages(mapped);
@@ -509,6 +516,18 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
                                             await pinMessage(msg.id, session.user.id);
                                         }
                                     }}
+                                    onThread={(msg: any) => {
+                                        setThreadMessage({
+                                            id: msg.id,
+                                            content: msg.content,
+                                            senderId: msg.senderId,
+                                            senderName: msg.senderName,
+                                            senderAvatar: msg.senderAvatar,
+                                            createdAt: msg.time,
+                                            conversationId: conversationId,
+                                            repliesCount: msg.replies?.length || 0
+                                        });
+                                    }}
                                 />
                             </motion.div>
                         );
@@ -558,6 +577,15 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
                 onOpenChange={setShowMediaSheet}
                 conversationId={conversationId}
             />
+
+            {/* Thread View Panel */}
+            <ThreadView
+                isOpen={!!threadMessage}
+                onClose={() => setThreadMessage(null)}
+                parentMessage={threadMessage || { id: "", content: "", senderId: "", createdAt: "", conversationId: "" }}
+                conversationId={conversationId}
+            />
         </div >
     );
 }
+

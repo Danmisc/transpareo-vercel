@@ -360,3 +360,4 @@ function PriceHistogram() {
         </div>
     )
 }
+

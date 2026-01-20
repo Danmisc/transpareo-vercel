@@ -112,3 +112,4 @@ export default function MortgageSimulator({ price }: MortgageSimulatorProps) {
         </div>
     );
 }
+

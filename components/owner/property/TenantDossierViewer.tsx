@@ -296,3 +296,4 @@ function DocumentCard({ title, type, status, onClick }: { title: string, type: s
         </div>
     )
 }
+

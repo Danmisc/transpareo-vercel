@@ -205,3 +205,4 @@ export function InviteTenantDialog({ propertyId, propertyName, suggestedRent, tr
         </Dialog>
     );
 }
+

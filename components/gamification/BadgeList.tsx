@@ -41,3 +41,4 @@ export function BadgeList({ badges, className }: BadgeListProps) {
         </div>
     );
 }
+

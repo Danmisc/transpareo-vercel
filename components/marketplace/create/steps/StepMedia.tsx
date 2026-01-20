@@ -89,3 +89,4 @@ export default function StepMedia({ data, update, onNext }: StepProps) {
         </div>
     );
 }
+

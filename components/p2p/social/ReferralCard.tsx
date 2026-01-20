@@ -94,3 +94,4 @@ export function ReferralCard({ initialCode }: ReferralCardProps) {
 function Badge({ children, className, variant }: any) {
     return <span className={`px-2 py-0.5 rounded text-xs font-medium ${className}`}>{children}</span>
 }
+

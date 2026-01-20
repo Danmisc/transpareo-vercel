@@ -9,17 +9,23 @@ export const feedService = {
     /**
      * Get the "For You" feed (Algorithmic)
      * Wraps the ranking service which scores posts based on engagement/recency/affinity.
+     * Accepts null userId for anonymous/public feed.
      */
-    getForYouFeed: async (userId: string, limit: number = 20, cursor?: string) => {
-        // Fetch User Profile for Location Context
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { location: true }
-        });
+    getForYouFeed: async (userId: string | null, limit: number = 20, cursor?: string) => {
+        // Fetch User Profile for Location Context (only if authenticated)
+        let userLocation: string | null = null;
 
-        return await rankingService.getRankedFeed(userId, {
+        if (userId) {
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { location: true }
+            });
+            userLocation = user?.location || null;
+        }
+
+        return await rankingService.getRankedFeed(userId || "anonymous", {
             limit,
-            userLocation: user?.location
+            userLocation
         });
     },
 
@@ -66,7 +72,16 @@ export const feedService = {
                         where: { userId },
                         select: { id: true, collectionId: true }
                     },
-                    video: true
+                    video: true,
+                    attachments: true,
+                    pollVotes: true,
+                    quotedPost: {
+                        include: {
+                            author: {
+                                select: { id: true, name: true, avatar: true }
+                            }
+                        }
+                    }
                 }
             });
 

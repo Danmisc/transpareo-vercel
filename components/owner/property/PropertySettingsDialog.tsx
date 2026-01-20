@@ -133,3 +133,4 @@ export function PropertySettingsDialog({ data, trigger }: PropertySettingsDialog
         </Dialog>
     );
 }
+

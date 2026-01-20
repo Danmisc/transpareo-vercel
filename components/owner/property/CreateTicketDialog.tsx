@@ -154,3 +154,4 @@ export function CreateTicketDialog({ propertyId, propertyName, trigger, open, on
         </Dialog>
     );
 }
+

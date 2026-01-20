@@ -37,3 +37,4 @@ export function MutualConnections({ connections }: MutualConnectionsProps) {
         </Card>
     );
 }
+

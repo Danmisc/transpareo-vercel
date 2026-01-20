@@ -106,3 +106,4 @@ export function AppSidebar({ userId, userImage, userName, className }: AppSideba
         </aside>
     );
 }
+

@@ -49,3 +49,4 @@ export function DocumentList({ documents }: { documents: any[] }) {
         </div>
     );
 }
+

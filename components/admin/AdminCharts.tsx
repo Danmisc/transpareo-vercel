@@ -75,3 +75,4 @@ export function AdminCharts({ activityData, revenueData }: AdminChartsProps) {
         </div>
     );
 }
+

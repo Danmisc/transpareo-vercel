@@ -42,3 +42,4 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
         </div>
     );
 }
+

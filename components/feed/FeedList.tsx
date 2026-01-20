@@ -31,7 +31,7 @@ function useIntersectionObserver(callback: () => void) {
 interface FeedListProps {
     initialPosts: any[];
     userId: string;
-    currentUserProfile: UserProfile;
+    currentUserProfile?: UserProfile; // Optional - undefined when not logged in
     feedType: string;
 }
 
@@ -164,6 +164,8 @@ export function FeedList({ initialPosts, userId, currentUserProfile, feedType }:
                                 badge: post.author.badges?.[0]?.badge || null
                             }}
                             published={new Date(post.createdAt).toLocaleDateString()}
+                            createdAt={new Date(post.createdAt)}
+                            isEdited={post.isEdited || false}
                             content={post.content}
                             image={post.image}
                             rankingScore={post.score}
@@ -171,12 +173,14 @@ export function FeedList({ initialPosts, userId, currentUserProfile, feedType }:
                             metadata={parsedMetadata}
                             isSaved={post.savedBy && post.savedBy.length > 0}
                             initialComments={serializeComments(post.comments)}
-                            userInteraction={post.interactions.find((i: any) => i.userId === userId) || null}
+                            userInteraction={post.interactions?.find((i: any) => i.userId === userId) || null}
                             metrics={{
-                                likes: post.interactions.filter((i: any) => i.type === "REACTION" || i.type === "LIKE").length,
-                                comments: post.comments.length,
+                                likes: post.interactions?.filter((i: any) => i.type === "REACTION" || i.type === "LIKE").length || 0,
+                                comments: post.comments?.length || 0,
                                 shares: 0
                             }}
+                            attachments={post.attachments}
+                            quotedPost={post.quotedPost || undefined}
                         />
                         {/* Inject Discovery Widget after 5th post */}
                         {index === 4 && <FeedDiscoveryWidget />}
@@ -206,3 +210,4 @@ export function FeedList({ initialPosts, userId, currentUserProfile, feedType }:
         </div>
     );
 }
+

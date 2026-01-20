@@ -82,3 +82,4 @@ export function DossierIdCard({ user, isVerified }: DossierIdCardProps) {
         </motion.div>
     );
 }
+

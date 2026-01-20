@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { feedService } from "@/lib/services/feed.service";
-import { DEMO_USER_ID } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
     const session = await auth();
-    const userId = session?.user?.id || DEMO_USER_ID;
+    const userId = session?.user?.id;
 
     const { searchParams } = new URL(req.url);
     const feedType = searchParams.get("type") || "for-you";
     const cursor = searchParams.get("cursor") || undefined;
     const limit = 10;
 
+    // Security: "following" feed requires authentication
+    if (feedType === "following" && !userId) {
+        return NextResponse.json(
+            { error: "Authentication required for following feed" },
+            { status: 401 }
+        );
+    }
+
     let posts;
     try {
-        if (feedType === "following") {
+        if (feedType === "following" && userId) {
             posts = await feedService.getFollowingFeed(userId, limit, cursor);
         } else {
-            posts = await feedService.getForYouFeed(userId, limit, cursor);
+            // For-you feed: personalized if logged in, public trending if not
+            posts = await feedService.getForYouFeed(userId || null, limit, cursor);
         }
 
         // Determine next cursor
@@ -28,10 +36,12 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             posts,
-            nextCursor
+            nextCursor,
+            isAuthenticated: !!userId
         });
     } catch (error) {
-        console.error("Feed API Error:", error);
+        console.error("[Feed API] Error:", error);
         return NextResponse.json({ error: "Failed to fetch feed" }, { status: 500 });
     }
 }
+

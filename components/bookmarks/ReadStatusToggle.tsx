@@ -37,3 +37,4 @@ export function ReadStatusToggle({ savedId, initialIsRead }: ReadStatusTogglePro
         </Button>
     );
 }
+

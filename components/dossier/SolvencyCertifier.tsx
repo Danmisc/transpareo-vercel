@@ -110,3 +110,4 @@ export function SolvencyCertifier({ userId, dossier }: SolvencyCertifierProps) {
         </div>
     );
 }
+

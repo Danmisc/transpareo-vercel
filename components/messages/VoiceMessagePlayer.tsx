@@ -139,3 +139,4 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
         </div>
     );
 }
+

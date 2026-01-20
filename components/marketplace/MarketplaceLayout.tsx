@@ -108,8 +108,8 @@ export function MarketplaceLayout({ header }: MarketplaceLayoutProps) {
 
 
     return (
-        <div className="flex flex-col h-screen w-full bg-white dark:bg-zinc-950">
-            {/* Global Header (Identical to Home) */}
+        <div className="flex flex-col h-screen w-full bg-white dark:bg-zinc-950 pt-20">
+            {/* Desktop Header */}
             <div className="hidden md:block z-50">
                 {header}
             </div>
@@ -172,3 +172,4 @@ export function MarketplaceLayout({ header }: MarketplaceLayoutProps) {
         </div>
     );
 }
+

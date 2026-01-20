@@ -49,3 +49,4 @@ export function MaintenanceStats({ tickets }: { tickets: any[] }) {
         </div>
     );
 }
+

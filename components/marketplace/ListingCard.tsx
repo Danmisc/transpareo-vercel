@@ -129,3 +129,4 @@ export function ListingCard({ listing }: { listing: any }) {
         </div>
     );
 }
+

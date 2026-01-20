@@ -111,3 +111,4 @@ export function GuarantorManager({ guarantors, dossierId }: GuarantorManagerProp
         </div>
     );
 }
+

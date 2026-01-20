@@ -1,24 +1,13 @@
 import { Header } from "@/components/layout/Header";
-import { ProfileHeader } from "@/components/profile/ProfileHeader";
-import { ProfileTabs } from "@/components/profile/ProfileTabs";
-import { ProfileInfo } from "@/components/profile/ProfileInfo";
-import { PostCard } from "@/components/feed/PostCard";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { prisma } from "@/lib/prisma";
 import { DEMO_USER_ID } from "@/lib/constants";
-import { auth } from "@/lib/auth"; // Import auth
+import { auth } from "@/lib/auth";
 import { notFound } from "next/navigation";
-import { Grid, List, Image, MapPin, ArrowLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { MediaPreview } from "@/components/profile/MediaPreview";
-import { MutualConnections } from "@/components/profile/MutualConnections";
-import { Pin } from "lucide-react";
-import { VideoFeedProvider } from "@/components/feed/VideoFeedProvider";
+import { getProfileViewsCount, logProfileView } from "@/lib/actions-profile";
+import { ProfilePageLayout } from "@/components/profile/ProfilePageLayout";
+
 
 // Helper for interactions
-// Using same helper as feed but locally scoped or imported if shared
 function serializeComments(comments: any[]): any[] {
     if (!comments) return [];
     return comments.map(c => ({
@@ -54,6 +43,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id: userId } = await params;
+    console.log("[ProfilePage] Requested ID:", userId);
+
     const session = await auth();
     const currentUserId = session?.user?.id || DEMO_USER_ID;
     const currentUser = await prisma.user.findUnique({ where: { id: currentUserId } });
@@ -77,11 +68,38 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                     comments: { include: { user: true } },
                     interactions: true
                 }
-            }
+            },
+            portfolioItems: {
+                orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
+                take: 10
+            },
+            storyHighlights: {
+                orderBy: { order: 'asc' },
+                take: 20
+            },
+            endorsementsReceived: {
+                include: {
+                    giver: {
+                        select: { id: true, name: true, avatar: true, role: true, headline: true }
+                    }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 10
+            },
+            experiences: {
+                orderBy: { startDate: 'desc' }
+            },
+            certifications: {
+                orderBy: { issueDate: 'desc' }
+            },
+            skills: { orderBy: { endorsementsCount: 'desc' } }, // NEW
+            searchCriteria: true,
         }
     });
 
     if (!profileUser) return notFound();
+
+    const user: any = profileUser;
 
     // Fetch Mutuals (Users I follow who follow this profile)
     let mutualConnections: any[] = [];
@@ -95,8 +113,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
             select: { id: true, name: true, avatar: true }
         });
     }
-
-    const user: any = profileUser;
 
     // Fetch Posts
     const posts = await prisma.post.findMany({
@@ -118,188 +134,82 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
             },
             interactions: true
         },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
+        take: 5 // Limit to recent activity
     });
 
     // Fetch Relationship Status
     let relationshipStatus = null;
     if (currentUser) {
-        // Dynamic import to avoid circular dep if any, or just import at top if clean
         const { getRelationshipStatus } = await import("@/lib/follow-actions");
         relationshipStatus = await getRelationshipStatus(currentUser.id, userId);
     }
 
     const userProfile = {
-        id: profileUser.id,
-        name: profileUser.name || "Utilisateur",
-        email: profileUser.email,
-        avatar: profileUser.avatar || "/avatars/default.svg",
-        role: profileUser.role as "USER" | "ADMIN" | "PRO",
-        bio: profileUser.bio || undefined,
-        location: profileUser.location || undefined,
-        website: profileUser.website || undefined,
-        coverImage: profileUser.coverImage || undefined,
-        joinedAt: new Date(profileUser.createdAt).getFullYear().toString(),
+        id: user.id,
+        name: user.name || "Utilisateur",
+        email: user.email,
+        avatar: user.avatar || "/avatars/default.svg",
+        role: user.role as "USER" | "ADMIN" | "PRO",
+        bio: user.bio || undefined,
+        location: user.location || undefined,
+        website: user.website || undefined,
+        coverImage: user.coverImage || undefined,
+        joinedAt: new Date(user.createdAt).getFullYear().toString(),
         stats: {
-            followers: profileUser._count.followedBy,
-            following: profileUser._count.following,
-            posts: profileUser._count.posts
+            followers: user._count.followedBy,
+            following: user._count.following,
+            posts: user._count.posts
         },
-        reputation: profileUser.reputation,
-        badges: profileUser.badges,
+        reputation: user.reputation,
+        badges: user.badges,
         isFollowing: relationshipStatus?.isFollowing || false,
         relationship: relationshipStatus,
-        links: (profileUser as any).links,
-        lastActive: (profileUser as any).lastActive
+        links: user.links,
+        lastActive: user.lastActive,
+
+        // Extended Real Estate Fields
+        headline: user.headline,
+        pronouns: user.pronouns,
+        currentStatus: user.currentStatus,
+        company: user.company,
+        companyWebsite: user.companyWebsite,
+        siren: user.siren,
+        experienceYears: user.experienceYears,
+        dealsCount: user.dealsCount,
+        assetsUnderManagement: user.assetsUnderManagement,
+        specialities: user.specialities,
+        languages: user.languages,
+        calendlyUrl: user.calendlyUrl,
+        whatsapp: user.whatsapp,
+        avatarDecoration: user.avatarDecoration,
+        experiences: user.experiences,
+        certifications: user.certifications,
+        skills: user.skills,
+        searchCriteria: user.searchCriteria,
     };
 
     const isCurrentUser = userId === currentUserId;
 
+    let profileViewsCount = 0;
+    if (isCurrentUser) {
+        profileViewsCount = await getProfileViewsCount(userId, 7);
+    } else if (currentUser) {
+        logProfileView(currentUser.id, userId);
+    }
+
     return (
-        <VideoFeedProvider>
-            <div className="min-h-screen bg-background font-sans">
-                <Header />
-
-                <main className="container max-w-5xl mx-auto px-4 py-8">
-                    <div className="mb-4">
-                        <Link href="/" className={cn(buttonVariants({ variant: "ghost" }), "pl-0 hover:bg-transparent hover:underline")}>
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Retour à l'accueil
-                        </Link>
-                    </div>
-
-                    <ProfileHeader
-                        user={userProfile}
-                        isCurrentUser={isCurrentUser}
-                    />
-
-                    <ProfileTabs>
-                        <TabsContent value="posts" className="mt-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                                {/* Left Sidebar: Info */}
-                                <div className="hidden lg:block col-span-1 space-y-6">
-                                    <ProfileInfo user={userProfile} isCurrentUser={isCurrentUser} />
-                                    <MediaPreview mediaItems={posts.filter(p => p.image).map(p => ({ id: p.id, url: p.image!, type: "IMAGE" }))} />
-                                    <MutualConnections connections={mutualConnections} />
-                                </div>
-
-                                {/* Main Feed */}
-                                <div className="col-span-1 lg:col-span-3 space-y-6">
-                                    {/* Mobile Info (Visible only on small screens) */}
-                                    <div className="block lg:hidden mb-6">
-                                        <ProfileInfo user={userProfile} isCurrentUser={isCurrentUser} />
-                                        <div className="mt-4">
-                                            <MediaPreview mediaItems={posts.filter(p => p.image).map(p => ({ id: p.id, url: p.image!, type: "IMAGE" }))} />
-                                        </div>
-                                        <div className="mt-4">
-                                            <MutualConnections connections={mutualConnections} />
-                                        </div>
-                                    </div>
-
-                                    {/* Pinned Post */}
-                                    {user.pinnedPost && (
-                                        <div className="border-b-4 border-primary/10 pb-6 mb-6">
-                                            <div className="flex items-center gap-2 text-xs font-bold text-primary mb-2 uppercase tracking-wider">
-                                                <Pin className="h-3 w-3 fill-current" /> Publication Épinglée
-                                            </div>
-                                            <PostCard
-                                                id={user.pinnedPost.id}
-                                                authorId={user.pinnedPost.authorId}
-                                                currentUser={currentUser ? {
-                                                    id: currentUser.id,
-                                                    name: currentUser.name || "User",
-                                                    avatar: currentUser.avatar || "/avatars/default.svg",
-                                                    role: currentUser.role as "USER" | "ADMIN" | "PRO"
-                                                } : undefined}
-                                                author={{
-                                                    name: user.pinnedPost.author.name || "Utilisateur",
-                                                    role: user.pinnedPost.author.role,
-                                                    avatar: user.pinnedPost.author.avatar || "/avatars/01.png",
-                                                    badge: user.pinnedPost.author.badges?.[0]?.badge || null
-                                                }}
-                                                published={new Date(user.pinnedPost.createdAt).toLocaleDateString()}
-                                                content={user.pinnedPost.content}
-                                                image={user.pinnedPost.image || undefined}
-                                                rankingScore={0}
-                                                type={user.pinnedPost.type}
-                                                metadata={user.pinnedPost.metadata ? JSON.parse(user.pinnedPost.metadata) : undefined}
-                                                initialComments={serializeComments(user.pinnedPost.comments)}
-                                                userInteraction={user.pinnedPost.interactions.find((i: any) => i.userId === DEMO_USER_ID) || null}
-                                                metrics={{
-                                                    likes: user.pinnedPost.interactions.filter((i: any) => i.type === "REACTION" || i.type === "LIKE").length,
-                                                    comments: user.pinnedPost.comments.length,
-                                                    shares: 0
-                                                }}
-                                                isPinned={true}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {posts.length > 0 ? (
-                                        <div className="space-y-6">
-                                            {posts.filter(p => p.id !== user.pinnedPost?.id).map((post) => { // Exclude pinned if regular feed
-                                                const parsedMetadata = post.metadata ? JSON.parse(post.metadata) : undefined;
-                                                return (
-                                                    <PostCard
-                                                        key={post.id}
-                                                        id={post.id}
-                                                        authorId={post.authorId}
-                                                        currentUser={currentUser ? {
-                                                            id: currentUser.id,
-                                                            name: currentUser.name || "User",
-                                                            avatar: currentUser.avatar || "/avatars/default.svg",
-                                                            role: currentUser.role as "USER" | "ADMIN" | "PRO"
-                                                        } : undefined}
-                                                        author={{
-                                                            name: post.author.name || "Utilisateur",
-                                                            role: post.author.role,
-                                                            avatar: post.author.avatar || "/avatars/01.png",
-                                                            badge: post.author.badges?.[0]?.badge || null
-                                                        }}
-                                                        published={new Date(post.createdAt).toLocaleDateString()}
-                                                        content={post.content}
-                                                        image={post.image || undefined}
-                                                        rankingScore={0}
-                                                        type={post.type}
-                                                        metadata={parsedMetadata}
-                                                        initialComments={serializeComments(post.comments)}
-                                                        userInteraction={post.interactions.find((i: any) => i.userId === DEMO_USER_ID) || null}
-                                                        metrics={{
-                                                            likes: post.interactions.filter((i: any) => i.type === "REACTION" || i.type === "LIKE").length,
-                                                            comments: post.comments.length,
-                                                            shares: 0
-                                                        }}
-                                                    />
-                                                )
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="py-12 text-center text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
-                                            Aucune publication pour le moment.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </TabsContent>
-
-                        <TabsContent value="media" className="mt-6">
-                            <div className="grid grid-cols-3 gap-1">
-                                {/* Filter posts with media */}
-                                {posts.filter(p => p.image).map(p => (
-                                    <div key={p.id} className="aspect-square bg-muted relative group cursor-pointer overflow-hidden">
-                                        <img src={p.image!} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                                    </div>
-                                ))}
-                                {posts.filter(p => p.image).length === 0 && (
-                                    <div className="col-span-full py-12 text-center text-muted-foreground">
-                                        Aucun média.
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-                    </ProfileTabs>
-                </main>
-            </div>
-        </VideoFeedProvider>
+        <ProfilePageLayout
+            user={user}
+            currentUser={currentUser}
+            userProfile={userProfile}
+            posts={posts}
+            mutualConnections={mutualConnections}
+            isCurrentUser={isCurrentUser}
+            profileViewsCount={profileViewsCount}
+            searchCriteria={user.searchCriteria}
+            certifications={user.certifications}
+            skills={user.skills}
+        />
     );
 }

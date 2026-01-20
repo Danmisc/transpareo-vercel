@@ -213,3 +213,4 @@ export function FiscalModule({ data }: { data: any }) {
         </div>
     );
 }
+

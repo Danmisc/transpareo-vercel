@@ -176,3 +176,4 @@ export function GifPicker({ onGifSelect, children }: GifPickerProps) {
         </Popover>
     );
 }
+

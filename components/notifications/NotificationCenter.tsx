@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, MessageSquare, Heart, UserPlus, AtSign } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -106,10 +107,15 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
             if (open) fetchNotifications();
         }}>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full group hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                    <motion.div
+                        whileHover={{ rotate: [0, -10, 10, -10, 10, 0] }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                    >
+                        <Bell className="h-5 w-5 text-zinc-600 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white transition-colors" />
+                    </motion.div>
                     {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-background animate-pulse" />
+                        <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
                     )}
                 </Button>
             </PopoverTrigger>
@@ -158,3 +164,4 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
         </Popover>
     );
 }
+

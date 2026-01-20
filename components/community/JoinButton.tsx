@@ -35,3 +35,4 @@ export function JoinButton({ communityId, userId, isMember }: { communityId: str
         </Button>
     );
 }
+

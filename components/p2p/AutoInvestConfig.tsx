@@ -144,3 +144,4 @@ export function AutoInvestConfig({ initialSettings }: AutoInvestProps) {
         </Card>
     );
 }
+

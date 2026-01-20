@@ -49,3 +49,4 @@ export function StickyNav({ children, className }: StickyNavProps) {
         </>
     );
 }
+

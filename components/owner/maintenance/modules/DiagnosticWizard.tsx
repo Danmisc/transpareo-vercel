@@ -255,3 +255,4 @@ export function DiagnosticWizard({ isOpen, onClose, onSubmit }: DiagnosticWizard
         </Dialog>
     );
 }
+

@@ -68,3 +68,4 @@ export function SocialButtons({ mode = "login", role }: { mode?: "login" | "regi
         </div>
     );
 }
+

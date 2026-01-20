@@ -28,6 +28,13 @@ export async function followUser(targetId: string, type: string = "FOLLOWER") {
             "a commencé à vous suivre."
         );
 
+        // --- SMART NOTIFICATIONS ---
+        // Check follower milestones and network growth (async, don't block)
+        import("@/lib/services/smart-notifications.service").then(({ smartNotificationsService }) => {
+            smartNotificationsService.checkFollowerMilestone(targetId).catch(() => { });
+            smartNotificationsService.checkNetworkGrowth(targetId).catch(() => { });
+        });
+
         revalidatePath(`/profile/${targetId}`);
         return { success: true };
     } catch (error) {

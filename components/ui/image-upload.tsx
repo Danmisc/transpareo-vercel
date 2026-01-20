@@ -11,9 +11,11 @@ interface ImageUploadProps {
     onChange: (url: string) => void;
     onRemove: () => void;
     className?: string;
+    accept?: string;
+    type?: "image" | "video";
 }
 
-export function ImageUpload({ value, onChange, onRemove, className }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, onRemove, className, accept = "image/*", type = "image" }: ImageUploadProps) {
     const [isUploading, setIsUploading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +45,11 @@ export function ImageUpload({ value, onChange, onRemove, className }: ImageUploa
     if (value) {
         return (
             <div className={cn("relative rounded-md overflow-hidden aspect-video bg-muted/50 border", className)}>
-                <img src={value} alt="Upload" className="object-cover w-full h-full" />
+                {type === "video" ? (
+                    <video src={value} className="object-cover w-full h-full" controls />
+                ) : (
+                    <img src={value} alt="Upload" className="object-cover w-full h-full" />
+                )}
                 <Button
                     size="icon"
                     variant="destructive"
@@ -69,7 +75,7 @@ export function ImageUpload({ value, onChange, onRemove, className }: ImageUploa
                         <>
                             <UploadCloud className="h-8 w-8 mb-2" />
                             <p className="text-sm font-semibold">Cliquez pour uploader</p>
-                            <p className="text-xs">PNG, JPG ou GIF</p>
+                            <p className="text-xs">{type === "video" ? "MP4, WebM (Max 50Mo)" : "PNG, JPG ou GIF"}</p>
                         </>
                     )}
                 </div>
@@ -77,7 +83,7 @@ export function ImageUpload({ value, onChange, onRemove, className }: ImageUploa
                     ref={inputRef}
                     type="file"
                     className="hidden"
-                    accept="image/*"
+                    accept={accept}
                     onChange={handleFileChange}
                     disabled={isUploading}
                 />
@@ -85,3 +91,4 @@ export function ImageUpload({ value, onChange, onRemove, className }: ImageUploa
         </div>
     );
 }
+

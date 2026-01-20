@@ -48,3 +48,4 @@ export function DossierHeader({ user, progress }: DossierHeaderProps) {
         </div>
     );
 }
+

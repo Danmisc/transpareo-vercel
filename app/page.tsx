@@ -1,31 +1,91 @@
-import { Header } from "@/components/layout/Header";
+
 import { SidebarLeft } from "@/components/layout/SidebarLeft";
 import { SidebarRight } from "@/components/layout/SidebarRight";
-import { CreatePost } from "@/components/feed/CreatePost";
+import { CreatePostEnhanced } from "@/components/feed/CreatePostEnhanced";
 import { FeedList } from "@/components/feed/FeedList";
 import { StoriesTray } from "@/components/feed/StoriesTray";
 import { BackToTop } from "@/components/ui/back-to-top";
 import { VideoFeedProvider } from "@/components/feed/VideoFeedProvider";
+import { TrendingFeedWrapper } from "@/components/feed/TrendingFeed";
 import { cn } from "@/lib/utils";
 
 import { feedService } from "@/lib/services/feed.service";
+import { discoveryService } from "@/lib/services/discovery.service";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { DEMO_USER_ID } from "@/lib/constants";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+
 import { FeedLayout } from "@/components/feed/FeedLayout";
 import { getDailyBriefStats } from "@/lib/actions-sidebar";
+import { Header } from "@/components/layout/Header";
 
 export default async function Home(props: { searchParams: Promise<{ feed?: string }> }) {
     const searchParams = await props.searchParams;
     const session = await auth();
     const userId = session?.user?.id || DEMO_USER_ID;
 
-    const feedType = searchParams.feed || "for-you"; // 'for-you' | 'following'
+    const feedType = searchParams.feed || "for-you"; // 'for-you' | 'following' | 'trending'
 
     // Fetch posts based on feed type
-    let posts;
-    if (feedType === "following") {
+    let posts: any[] = [];
+    let trendingData: any[] = [];
+    let recommendedUsers: any[] = [];
+    let trendingPosts: any[] = [];
+
+    if (feedType === "trending") {
+        // Fetch trending data with velocity and trending posts
+        const [trends, velocityTrends, users, hotPosts] = await Promise.all([
+            discoveryService.getTrendingHashtags(20),
+            discoveryService.getTrendingHashtagsWithVelocity(15),
+            discoveryService.getRecommendedUsers(userId, 8),
+            feedService.getForYouFeed(userId) // Get popular posts
+        ]);
+
+        // Create velocity map for quick lookup
+        const velocityMap = new Map(
+            velocityTrends.map((v: any) => [v.tag || v.name, v.velocity || 0])
+        );
+
+        trendingData = trends.map((t: any) => {
+            const velocity = velocityMap.get(t.tag || t.name) || 0;
+            return {
+                id: t.id || t.tag,
+                tag: t.tag || t.name,
+                category: t.category || "Immobilier",
+                postCount: t.count || t._count?.posts || 0,
+                velocity: velocity,
+                isHot: velocity > 30 || (t.count || 0) > 50
+            };
+        });
+
+        recommendedUsers = users.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            username: u.name?.toLowerCase().replace(/\s/g, ''),
+            avatar: u.avatar,
+            bio: u.bio || u.headline,
+            isVerified: u.role === "PRO" || u.role === "AGENCY",
+            followersCount: u._count?.followedBy || 0
+        }));
+
+        // Transform trending posts
+        trendingPosts = hotPosts.slice(0, 5).map((p: any) => ({
+            id: p.id,
+            content: p.content,
+            image: p.image || p.attachments?.[0]?.url,
+            author: {
+                id: p.authorId,
+                name: p.author?.name || "Utilisateur",
+                avatar: p.author?.avatar,
+                isVerified: p.author?.role === "PRO" || p.author?.role === "AGENCY"
+            },
+            likes: p.metrics?.likes || p.interactions?.filter((i: any) => i.type === "LIKE").length || 0,
+            comments: p.metrics?.comments || p.comments?.length || 0,
+            shares: p.metrics?.shares || 0,
+            isVideo: p.type === "VIDEO",
+            createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "Récent"
+        }));
+    } else if (feedType === "following") {
         posts = await feedService.getFollowingFeed(userId);
     } else {
         posts = await feedService.getForYouFeed(userId);
@@ -34,9 +94,9 @@ export default async function Home(props: { searchParams: Promise<{ feed?: strin
     const currentUserProfile = session?.user?.id ? {
         id: session.user.id,
         name: session.user.name || "Utilisateur",
-        avatar: session.user.image || "/avatars/default.png",
+        avatar: session.user.image || "/avatars/default.svg",
         role: "USER"
-    } : { id: DEMO_USER_ID, name: "Sophie Dubreuil (Invité)", avatar: "/avatars/03.png" };
+    } : undefined; // No guest user - show login prompt instead
 
     const dailyBrief = await getDailyBriefStats(userId);
 
@@ -48,15 +108,16 @@ export default async function Home(props: { searchParams: Promise<{ feed?: strin
     ];
 
     return (
-        <div className="min-h-screen bg-background font-sans text-foreground pb-20 md:pb-0">
+        <div className="min-h-screen bg-background font-sans text-foreground pb-20 md:pb-0 md:pt-24">
             {/* Ambient Background */}
             <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
                 <div className="absolute top-0 left-1/4 w-[40rem] h-[40rem] bg-orange-200/20 dark:bg-orange-500/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen opacity-70 animate-blob" />
                 <div className="absolute top-1/4 right-1/4 w-[40rem] h-[40rem] bg-blue-200/20 dark:bg-blue-500/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen opacity-70 animate-blob animation-delay-2000" />
             </div>
 
+            {/* Desktop Header */}
             <div className="hidden md:block">
-                <Header />
+                <Header user={session?.user} />
             </div>
 
             {/* Mobile Header */}
@@ -95,24 +156,34 @@ export default async function Home(props: { searchParams: Promise<{ feed?: strin
                         </div>
                     </div>
 
-                    <VideoFeedProvider>
-                        {session?.user && (
-                            <div className="px-4 md:px-0 space-y-6">
-                                <StoriesTray />
-                                <CreatePost currentUser={currentUserProfile} />
-                            </div>
-                        )}
-
-                        <FeedList
-                            initialPosts={posts}
-                            userId={userId}
-                            currentUserProfile={currentUserProfile}
-                            feedType={feedType}
+                    {/* Content based on feed type */}
+                    {feedType === "trending" ? (
+                        <TrendingFeedWrapper
+                            trendingData={trendingData}
+                            recommendedUsers={recommendedUsers}
+                            trendingPosts={trendingPosts}
                         />
-                    </VideoFeedProvider>
+                    ) : (
+                        <VideoFeedProvider>
+                            {session?.user && (
+                                <div className="px-4 md:px-0 space-y-6">
+                                    <StoriesTray />
+                                    <CreatePostEnhanced currentUser={currentUserProfile} />
+                                </div>
+                            )}
+
+                            <FeedList
+                                initialPosts={posts}
+                                userId={userId}
+                                currentUserProfile={currentUserProfile}
+                                feedType={feedType}
+                            />
+                        </VideoFeedProvider>
+                    )}
                 </FeedLayout>
             </div>
 
         </div>
     );
 }
+

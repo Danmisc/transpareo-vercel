@@ -131,3 +131,4 @@ export function RentResume({ userId, payments }: RentResumeProps) {
         </div>
     );
 }
+

@@ -17,3 +17,4 @@ export function CreateListingDialog({ onSuccess }: CreateListingDialogProps) {
         </Link>
     );
 }
+

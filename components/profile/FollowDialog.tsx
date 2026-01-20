@@ -80,3 +80,4 @@ export function FollowDialog({ userId, trigger, initialTab = "followers" }: Foll
         </Dialog>
     );
 }
+

@@ -381,3 +381,4 @@ function AddTransactionDialog({ propertyId, activeLeaseId }: { propertyId: strin
         </Dialog>
     );
 }
+

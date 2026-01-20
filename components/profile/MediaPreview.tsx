@@ -35,3 +35,4 @@ export function MediaPreview({ mediaItems }: MediaPreviewProps) {
         </Card>
     );
 }
+

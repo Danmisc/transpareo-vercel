@@ -87,3 +87,4 @@ export function DossierScoreRing({ score, size = 120, strokeWidth = 8 }: Dossier
         </div>
     );
 }
+

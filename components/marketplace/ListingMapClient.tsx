@@ -43,3 +43,4 @@ export default function ListingMapClient({ lat, lng, address }: ListingMapClient
         </div>
     );
 }
+

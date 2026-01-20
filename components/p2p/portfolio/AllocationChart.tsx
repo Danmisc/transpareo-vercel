@@ -44,3 +44,4 @@ export function AllocationChart({ portfolio }: { portfolio: any[] }) {
         </Card>
     );
 }
+

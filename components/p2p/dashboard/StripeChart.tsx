@@ -53,3 +53,4 @@ export function StripeChart({ data }: { data: any[] }) {
         </div>
     );
 }
+

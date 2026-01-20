@@ -210,3 +210,4 @@ export function CreatePropertyDialog({ trigger }: CreatePropertyDialogProps) {
         </Dialog>
     );
 }
+

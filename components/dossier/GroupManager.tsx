@@ -122,3 +122,4 @@ export function GroupManager({ userId, dossier }: GroupManagerProps) {
         </div>
     );
 }
+

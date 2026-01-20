@@ -100,3 +100,4 @@ export function ProjectTimeline({ updates, loanId, isOwner }: TimelineProps) {
         </div>
     );
 }
+

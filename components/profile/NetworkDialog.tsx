@@ -98,3 +98,4 @@ export function NetworkDialog({ isOpen, onClose, userId, initialTab = "followers
         </Dialog>
     );
 }
+

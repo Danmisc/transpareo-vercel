@@ -10,6 +10,7 @@ import { CommentItem } from "./CommentItem";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { GifPicker } from "@/components/ui/GifPicker";
 
 interface CommentSectionProps {
     postId: string;
@@ -213,6 +214,18 @@ export function CommentSection({ postId, postAuthorId, initialComments = [], cur
                                     rows={1}
                                 />
                                 <div className="absolute right-1 top-1 flex items-center gap-1">
+                                    <GifPicker
+                                        onSelect={(gifUrl) => setMediaUrl(gifUrl)}
+                                        trigger={
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                            >
+                                                <span className="text-xs font-bold">GIF</span>
+                                            </Button>
+                                        }
+                                    />
                                     <Button
                                         size="icon"
                                         variant="ghost"
@@ -269,3 +282,4 @@ export function CommentSection({ postId, postAuthorId, initialComments = [], cur
         </div>
     );
 }
+

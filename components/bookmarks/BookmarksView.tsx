@@ -131,7 +131,7 @@ export function BookmarksView({ collections, savedPosts, currentUser }: Bookmark
                                     currentUser={currentUser}
                                     author={{
                                         name: item.post.author.name || "User",
-                                        avatar: item.post.author.avatar || "/avatars/default.png",
+                                        avatar: item.post.author.avatar || "/avatars/default.svg",
                                         role: item.post.author.role || "Membre"
                                     }}
                                     content={item.post.content}
@@ -153,3 +153,4 @@ export function BookmarksView({ collections, savedPosts, currentUser }: Bookmark
         </div>
     );
 }
+

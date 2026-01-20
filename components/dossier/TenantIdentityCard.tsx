@@ -113,3 +113,4 @@ export function TenantIdentityCard({ user, dossier }: TenantIdentityCardProps) {
         </div>
     );
 }
+

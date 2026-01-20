@@ -539,3 +539,4 @@ function SearchSkeleton() {
         </div>
     );
 }
+

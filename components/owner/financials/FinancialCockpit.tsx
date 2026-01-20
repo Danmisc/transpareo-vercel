@@ -210,3 +210,4 @@ export function FinancialCockpit({ data }: FinancialCockpitProps) {
         </motion.div>
     );
 }
+

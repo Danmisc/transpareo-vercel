@@ -35,6 +35,9 @@
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-spotlight: spotlight 2s ease .75s 1 forwards;
+  --animate-gradient-x: gradient-x 15s ease infinite;
+  --animate-shimmer: spin 2s linear infinite;
 }
 
 @layer base {
@@ -68,6 +71,8 @@
     --ring: 24.6 95% 53.1%;
 
     --radius: 0.75rem;
+
+    --header-bg-scrolled: rgba(255, 255, 255, 0.8);
   }
 
   .dark {
@@ -98,6 +103,9 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 24.6 95% 53.1%;
+
+    --header-bg-scrolled: rgba(9, 9, 11, 0.6);
+    /* zinc-950/60 */
   }
 }
 
@@ -121,9 +129,43 @@
   }
 }
 
+@keyframes spotlight {
+  0% {
+    opacity: 0;
+    transform: translate(-72%, -62%) scale(0.5);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -40%) scale(1);
+  }
+}
+
+@keyframes gradient-x {
+
+  0%,
+  100% {
+    background-size: 200% 200%;
+    background-position: left center;
+  }
+
+  50% {
+    background-size: 200% 200%;
+    background-position: right center;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth !important;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {

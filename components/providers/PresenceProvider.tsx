@@ -62,3 +62,4 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const usePresence = () => useContext(PresenceContext);
+

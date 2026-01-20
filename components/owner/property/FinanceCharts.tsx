@@ -46,3 +46,4 @@ export function ExpensesPieChart({ data }: { data: any[] }) {
         </ResponsiveContainer>
     );
 }
+

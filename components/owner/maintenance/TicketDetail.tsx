@@ -391,3 +391,4 @@ export function TicketDetail({ ticketId, open, onClose }: TicketDetailProps) {
         </Dialog>
     );
 }
+

@@ -72,3 +72,4 @@ export function DossierScore({ score }: DossierScoreProps) {
         </div>
     );
 }
+

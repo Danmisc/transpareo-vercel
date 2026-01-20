@@ -94,3 +94,4 @@ export default function StepType({ data, update, onNext }: StepProps) {
         </div>
     );
 }
+

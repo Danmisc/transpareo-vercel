@@ -21,7 +21,7 @@ export async function Leaderboard() {
                     <div key={user.id} className="flex items-center gap-3">
                         <div className="font-bold text-muted-foreground w-4 text-center">{index + 1}</div>
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.avatar || "/avatars/default.png"} />
+                            <AvatarImage src={user.avatar || "/avatars/default.svg"} />
                             <AvatarFallback>{user.name?.[0]}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -44,3 +44,4 @@ export async function Leaderboard() {
         </Card>
     );
 }
+

@@ -149,3 +149,4 @@ export function RecordPaymentDialog({ leaseId, tenantName, rentAmount, trigger }
         </Dialog>
     );
 }
+

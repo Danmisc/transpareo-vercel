@@ -136,7 +136,8 @@ export const searchService = {
                     author: { select: { name: true, avatar: true, role: true } },
                     _count: { select: { comments: true } },
                     interactions: true,
-                    video: true // Include video to check existence
+                    video: true, // Include video to check existence
+                    attachments: true
                 }
             });
 

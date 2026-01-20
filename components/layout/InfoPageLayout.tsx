@@ -54,3 +54,4 @@ export function InfoPageLayout({ title, subtitle, children }: InfoPageLayoutProp
         </div>
     );
 }
+

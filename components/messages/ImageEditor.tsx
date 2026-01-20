@@ -100,3 +100,4 @@ export function ImageEditor({ open, onOpenChange, imageSrc, onSave }: ImageEdito
         </Dialog>
     );
 }
+

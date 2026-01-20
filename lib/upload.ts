@@ -2,7 +2,7 @@
 
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-// Using web crypto API available in Node 19+ (Next.js 15+)
+import { randomUUID } from "crypto";
 
 export async function uploadFile(formData: FormData) {
     const file = formData.get("file") as File;
@@ -15,8 +15,7 @@ export async function uploadFile(formData: FormData) {
 
     // Create unique name
     const ext = file.name.split('.').pop() || 'png';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filename = `${(globalThis as any).crypto.randomUUID()}.${ext}`;
+    const filename = `${randomUUID()}.${ext}`;
 
     // Ensure directory exists
     const uploadDir = join(process.cwd(), "public", "uploads");

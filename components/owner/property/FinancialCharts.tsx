@@ -93,3 +93,4 @@ export function FinancialCharts() {
         </Card>
     );
 }
+

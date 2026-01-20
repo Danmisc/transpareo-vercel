@@ -217,3 +217,4 @@ export function ReceiptGenerator({ data, trigger }: ReceiptProps) {
     );
 }
 
+

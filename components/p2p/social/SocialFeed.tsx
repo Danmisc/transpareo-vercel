@@ -81,3 +81,4 @@ export function SocialFeed({ activities }: SocialFeedProps) {
         </Card>
     );
 }
+

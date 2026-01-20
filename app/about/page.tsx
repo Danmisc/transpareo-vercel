@@ -449,3 +449,4 @@ function LogoPlaceholder({ text }: { text: string }) {
         </div>
     )
 }
+

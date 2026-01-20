@@ -208,3 +208,4 @@ export function CashflowModule({ data }: { data: any }) {
         </div>
     );
 }
+

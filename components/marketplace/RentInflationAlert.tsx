@@ -43,3 +43,4 @@ export function RentInflationAlert({ currentPrice, estimatedPrice }: RentInflati
         </div>
     );
 }
+

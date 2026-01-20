@@ -29,7 +29,7 @@ export async function connectExternalBank(providerId: string, providerName: stri
             }
         });
 
-        revalidatePath("/p2p/wallet");
+        revalidatePath("/p2p/gains");
         return { success: true };
     } catch (error) {
         console.error("Link Bank Error:", error);

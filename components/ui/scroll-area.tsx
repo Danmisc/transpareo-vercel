@@ -15,3 +15,4 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 ScrollArea.displayName = "ScrollArea"
 
 export { ScrollArea }
+

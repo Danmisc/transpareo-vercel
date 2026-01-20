@@ -40,3 +40,4 @@ export function MiniBadge({ badge }: MiniBadgeProps) {
         </TooltipProvider>
     );
 }
+

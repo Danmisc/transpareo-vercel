@@ -238,3 +238,4 @@ export function OwnerTenants({ properties = [] }: OwnerTenantsProps) {
         </div>
     );
 }
+

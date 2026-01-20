@@ -206,3 +206,4 @@ export function ListingFilters({ filters, onFilterChange }: ListingFiltersProps)
         </div>
     );
 }
+

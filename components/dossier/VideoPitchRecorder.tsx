@@ -344,3 +344,4 @@ export function VideoPitchRecorder({ userId, initialUrl }: VideoPitchRecorderPro
         </div>
     );
 }
+

@@ -217,3 +217,4 @@ export function PropertyTenants({ data }: { data: any }) {
         </div>
     );
 }
+

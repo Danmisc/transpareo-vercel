@@ -20,3 +20,4 @@ interface ListingMapProps {
 export default function ListingMap(props: ListingMapProps) {
     return <ListingMapClient {...props} />;
 }
+

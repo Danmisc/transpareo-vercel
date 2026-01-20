@@ -163,3 +163,4 @@ export function AdvancedHistoryTable({ portfolio }: AdvancedHistoryTableProps) {
         </div>
     );
 }
+

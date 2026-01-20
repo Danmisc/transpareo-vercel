@@ -111,3 +111,4 @@ export function NeighborhoodFeed({ communityId, currentUser, initialPosts }: Nei
         </div>
     );
 }
+

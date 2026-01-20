@@ -187,3 +187,4 @@ export function ApplicationKanban({ userId }: { userId: string }) {
         </div>
     );
 }
+

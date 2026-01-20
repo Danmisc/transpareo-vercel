@@ -121,3 +121,4 @@ export function ListingSidebar({ listing }: ListingSidebarProps) {
         </div>
     );
 }
+

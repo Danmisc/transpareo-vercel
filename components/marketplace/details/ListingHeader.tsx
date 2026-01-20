@@ -87,3 +87,4 @@ export function ListingHeader({ listing }: ListingHeaderProps) {
         </div>
     );
 }
+

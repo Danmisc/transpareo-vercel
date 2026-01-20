@@ -364,3 +364,4 @@ function UploadDialog({ open, onOpenChange, file, propertyId }: any) {
         </Dialog>
     );
 }
+
