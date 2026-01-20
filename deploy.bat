@@ -1,49 +1,42 @@
 @echo off
 echo ==========================================
-echo      TRANSPAREO - DEPLOYMENT SCRIPT
+echo      TRANSPAREO - DEPLOYMENT SCRIPT (FIX)
 echo ==========================================
 
 REM Define explicit Git path found by agent
 set GIT_EXE="C:\Users\%USERNAME%\AppData\Local\Programs\Git\cmd\git.exe"
 
-echo Checking for Git at %GIT_EXE%...
+echo Checking for Git...
 %GIT_EXE% --version
 IF %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Git is not found at the expected location.
-    echo Trying standard path...
-    set GIT_EXE="git"
-    git --version
-    IF %ERRORLEVEL% NEQ 0 (
-        echo [FATAL] Git not found. Please restart terminal.
-        pause
-        exit /b
-    )
+    echo [ERROR] Git not found. Please restart terminal.
+    pause
+    exit /b
 )
 
 echo.
-echo 1. Initializing Repository...
-%GIT_EXE% init
-
-echo.
-echo 2. Adding files...
+echo 1. Adding latest changes...
 %GIT_EXE% add .
 
 echo.
-echo 3. Committing changes...
-%GIT_EXE% commit -m "Configure Vercel deployment with Postgres migration"
+echo 2. Committing...
+%GIT_EXE% commit -m "Deploy to transpareo-vercel"
 
 echo.
-echo [IMPORTANT]
-echo If you haven't linked your GitHub repository yet, run:
-echo git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-echo (You might need to use the absolute path to git if it fails)
-echo.
+echo 3. FIXING REPOSITORY URL...
+echo Switching remote to: https://github.com/Danmisc/transpareo-vercel
+%GIT_EXE% remote set-url origin https://github.com/Danmisc/transpareo-vercel
+IF %ERRORLEVEL% NEQ 0 (
+    echo Original remote not found, adding new one...
+    %GIT_EXE% remote add origin https://github.com/Danmisc/transpareo-vercel
+)
 
-echo 4. Pushing to GitHub...
+echo.
+echo 4. Pushing to correct repository...
 %GIT_EXE% push -u origin main
 
 echo.
 echo ==========================================
-echo Done! Build should start on Vercel.
+echo Done! Check 'transpareo-vercel' on GitHub.
 echo ==========================================
 pause
