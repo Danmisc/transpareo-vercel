@@ -18,26 +18,31 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [playbackRate, setPlaybackRate] = useState(1);
+    const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
         if (!containerRef.current || isOptimistic) return;
 
         const wavesurfer = WaveSurfer.create({
             container: containerRef.current,
-            waveColor: isMe ? "rgba(255, 255, 255, 0.5)" : "#E4E4E7", // Zinc-200
-            progressColor: isMe ? "#FFFFFF" : "#F97316", // Orange-500
+            waveColor: isMe ? "#fed7aa" : "#E4E4E7",
+            progressColor: isMe ? "#FFFFFF" : "#F97316",
             cursorColor: "transparent",
             barWidth: 2,
-            barGap: 3,
-            barRadius: 3,
-            height: 32,
+            barGap: 2,
+            barRadius: 2,
+            height: 26,
             normalize: true,
             backend: "WebAudio",
             url: src,
+            minPxPerSec: 1,
+            fillParent: true,
+            interact: true,
         });
 
         wavesurfer.on('ready', () => {
             setDuration(wavesurfer.getDuration());
+            setIsReady(true);
         });
 
         wavesurfer.on('audioprocess', () => {
@@ -52,6 +57,10 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
         wavesurfer.on('play', () => setIsPlaying(true));
         wavesurfer.on('pause', () => setIsPlaying(false));
 
+        wavesurfer.on('interaction', () => {
+            setCurrentTime(wavesurfer.getCurrentTime());
+        });
+
         waveSurferRef.current = wavesurfer;
 
         return () => {
@@ -61,10 +70,10 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
 
     // Update playback rate
     useEffect(() => {
-        if (waveSurferRef.current) {
+        if (waveSurferRef.current && isReady) {
             waveSurferRef.current.setPlaybackRate(playbackRate);
         }
-    }, [playbackRate]);
+    }, [playbackRate, isReady]);
 
     const togglePlay = () => {
         if (waveSurferRef.current) {
@@ -72,7 +81,8 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
         }
     };
 
-    const cycleSpeed = () => {
+    const cycleSpeed = (e: React.MouseEvent) => {
+        e.stopPropagation();
         const speeds = [1, 1.5, 2];
         const nextIndex = (speeds.indexOf(playbackRate) + 1) % speeds.length;
         setPlaybackRate(speeds[nextIndex]);
@@ -87,56 +97,54 @@ export function VoiceMessagePlayer({ src, isMe, isOptimistic }: VoiceMessagePlay
 
     return (
         <div className={cn(
-            "flex items-center gap-3 p-2 rounded-2xl min-w-[240px] transition-all",
-            "bg-transparent"
+            "flex items-center gap-3 px-1 py-0.5 min-w-[200px] select-none group",
+            // Parent handles background
         )}>
+            {/* Play Button */}
             <button
                 onClick={togglePlay}
                 disabled={isOptimistic}
                 type="button"
                 className={cn(
-                    "w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-95",
-                    isMe ? "bg-white text-orange-600" : "bg-orange-500 text-white",
+                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-95 relative",
+                    isMe ? "bg-white text-orange-600 hover:bg-orange-50" : "bg-white dark:bg-zinc-800 text-orange-500 hover:bg-zinc-50 dark:hover:bg-zinc-700",
                     isOptimistic && "opacity-50 cursor-not-allowed"
                 )}
             >
                 {isOptimistic ? (
-                    <Loader2 size={18} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin" />
                 ) : isPlaying ? (
-                    <Pause size={18} className="fill-current" />
+                    <Pause size={16} className="fill-current" />
                 ) : (
-                    <Play size={18} className="fill-current ml-0.5" />
+                    <Play size={16} className="fill-current ml-0.5" />
                 )}
             </button>
 
-            <div className="flex-1 flex flex-col justify-center gap-1 min-w-[120px]">
-                {/* Waveform Container */}
-                <div ref={containerRef} className="w-full" />
+            {/* Waveform & Metadata */}
+            <div className="flex-1 flex flex-col gap-0.5 min-w-[140px]">
+                {/* Waveform */}
+                <div ref={containerRef} className="w-full h-[26px] cursor-pointer" />
 
-                <div className="flex items-center justify-between px-1">
-                    <span className={cn("text-[10px] font-medium font-mono", isMe ? "text-white/80" : "text-zinc-500")}>
+                {/* Info Row: Time & Speed */}
+                <div className="flex items-center justify-between text-[11px] font-medium tabular-nums px-0.5 h-4 mt-0.5">
+                    <span className={cn(isMe ? "text-white/90" : "text-zinc-500 dark:text-zinc-400")}>
                         {formatTime(isPlaying ? currentTime : duration)}
                     </span>
-                    <span className={cn("text-[10px] font-medium font-mono", isMe ? "text-white/80" : "text-zinc-500")}>
-                        {formatTime(duration)}
-                    </span>
+
+                    <button
+                        onClick={cycleSpeed}
+                        type="button"
+                        className={cn(
+                            "px-1.5 rounded text-[10px] font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer relative z-10",
+                            isMe
+                                ? "text-white/90 hover:bg-white/20"
+                                : "text-zinc-500 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-zinc-800"
+                        )}
+                    >
+                        {playbackRate}x
+                    </button>
                 </div>
             </div>
-
-            {/* Speed Control */}
-            <button
-                onClick={cycleSpeed}
-                type="button"
-                className={cn(
-                    "h-8 px-2 text-[10px] font-bold rounded-lg transition-colors border",
-                    isMe
-                        ? "bg-white/20 text-white border-white/20 hover:bg-white/30"
-                        : "bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100"
-                )}
-            >
-                {playbackRate}x
-            </button>
         </div>
     );
 }
-

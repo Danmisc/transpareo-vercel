@@ -27,6 +27,7 @@ import { SmartPropertyCard } from "./SmartPropertyCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVideoFeed } from "./VideoFeedProvider";
 import { pusherClient } from "@/lib/pusher";
+import { VoiceRecorder } from "@/components/ui/voice-recorder";
 
 interface PostCardProps {
     id: string;
@@ -298,6 +299,15 @@ export function PostCard({
                         <SmartPropertyCard {...effectiveMetadata} image={displayImage} />
                     )}
 
+                    {type === "AUDIO" && displayImage && (
+                        <div className="py-2">
+                            <VoiceRecorder
+                                initialAudioUrl={displayImage}
+                                readOnly
+                            />
+                        </div>
+                    )}
+
                     {type === "VIDEO" && displayImage && (
                         <div ref={videoContainerRef} className="rounded-xl overflow-hidden relative group cursor-pointer">
                             <Link href={`/reels/${id}`} className="block">
@@ -506,4 +516,3 @@ export function PostCard({
         </motion.div>
     );
 }
-

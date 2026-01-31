@@ -17,11 +17,13 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
     const showChat = isDesktop || !isRoot;
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-white overflow-hidden relative">
+        // Main container
+        <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-white dark:bg-zinc-900 overflow-hidden relative">
+
             {/* Sidebar / Conversation List */}
             <div
                 className={cn(
-                    "flex-shrink-0 transition-all duration-300 ease-in-out border-r border-zinc-200 bg-white z-20",
+                    "flex-shrink-0 transition-all duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800/50 bg-white dark:bg-zinc-900 z-20",
                     showList ? "w-full md:w-[380px] opacity-100 translate-x-0" : "w-0 opacity-0 -translate-x-full absolute md:static"
                 )}
             >
@@ -31,12 +33,12 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
             {/* Main Chat Area */}
             <div
                 className={cn(
-                    "flex-1 flex flex-col transition-all duration-300 bg-zinc-50/50 relative",
+                    "flex-1 flex flex-col transition-all duration-300 bg-zinc-50/50 dark:bg-zinc-900 relative",
                     showChat ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full absolute md:static md:translate-x-0 md:opacity-100"
                 )}
             >
                 {/* Desktop Ambient Background - Light Mode */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/40 via-white to-white pointer-events-none -z-10" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/40 via-white to-white dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-900 pointer-events-none -z-10" />
                 {children}
             </div>
         </div>

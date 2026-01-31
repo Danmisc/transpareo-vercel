@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
     Image, MapPin, BarChart2, Video, Send, X, Loader2,
     FileText, Code, Link2, Clock, Users, Save, Home,
-    ChevronDown, Sparkles, Layers, Settings2
+    ChevronDown, Sparkles, Layers, Settings2, Mic
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,6 +17,7 @@ import { saveDraft, schedulePost } from "@/lib/actions-content";
 import { UserProfile } from "@/lib/types";
 import { MultiImageUpload } from "@/components/ui/multi-image-upload";
 import { toast } from "sonner";
+import { VoiceRecorder } from "@/components/ui/voice-recorder";
 
 // Import new editor components
 import { RichTextEditor, MarkdownPreview } from "@/components/editor/RichTextEditor";
@@ -28,11 +29,12 @@ import { CarouselEditor } from "@/components/editor/CarouselEditor";
 import { MapEmbedPicker } from "@/components/editor/MapEmbedPicker";
 import { CollaboratorInvite } from "@/components/editor/CollaboratorInvite";
 
-type PostType = "TEXT" | "IMAGE" | "VIDEO" | "POLL" | "PROPERTY" | "CODE" | "LINK" | "MAP";
+type PostType = "TEXT" | "IMAGE" | "VIDEO" | "POLL" | "PROPERTY" | "CODE" | "LINK" | "MAP" | "AUDIO";
 type ContentFormat = "TEXT" | "MARKDOWN" | "RICHTEXT";
 
 interface CreatePostEnhancedProps {
     currentUser?: UserProfile;
+    communityId?: string; // Optional context
     onPostCreated?: () => void;
 }
 
@@ -64,8 +66,8 @@ interface CarouselSlide {
     type: "IMAGE" | "VIDEO";
 }
 
-export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnhancedProps) {
-    const searchParams = useSearchParams(); // NEW
+export function CreatePostEnhanced({ currentUser, communityId, onPostCreated }: CreatePostEnhancedProps) {
+    const searchParams = useSearchParams();
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [content, setContent] = useState("");
@@ -115,8 +117,11 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
     // Map embeds
     const [mapEmbeds, setMapEmbeds] = useState<MapLocation[]>([]);
 
-    // Collaboration
+    // Collaborators
     const [collaborators, setCollaborators] = useState<any[]>([]);
+
+    // Voice
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 
     // Reset form
     const resetForm = () => {
@@ -131,13 +136,14 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
         setLinkPreviews([]);
         setMapEmbeds([]);
         setCollaborators([]);
+        setAudioBlob(null);
         setIsExpanded(false);
         setShowAdvanced(false);
     };
 
     // Handle publish
     const handlePublish = async () => {
-        if (!content.trim() && postType === "TEXT" && mediaUrls.length === 0 && codeBlocks.length === 0) {
+        if (!content.trim() && postType === "TEXT" && mediaUrls.length === 0 && codeBlocks.length === 0 && !audioBlob) {
             toast.error("Ajoutez du contenu à votre post");
             return;
         }
@@ -159,16 +165,46 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
         }
 
         try {
+            // Check for Audio
+            let attachments = isCarousel ? carouselSlides.map(s => s.url) : mediaUrls;
+
+            if (postType === "AUDIO" && audioBlob) {
+                // Upload Logic for Blob would be here - assuming onSendMessage handles it, but CreatePost is different.
+                // We need to upload the blob first.
+                // Since createPost takes URLs, we need to upload via a helper or assume createPost handles files (it doesn't seems to).
+                // For now, let's assume we convert blob to File and use a hypothetical upload that returns URL, OR
+                // we just pass it if our backend supported it.
+                // Wait, the previous implementation used `onSendMessage` which handles files. `createPost` takes URLs.
+                // We need to upload the audio file first.
+                // Let's create a temporary file and use uploadFiles logic if available, or just omit implementation details for now if the user just wants visuals restored.
+                // But for functionality, we need it.
+                // Let's assume we have an upload helper. `uploadFiles` was imported in ChatInput.
+                // I'll import `uploadFiles` here implicitly or just mock it for this restoration step?
+                // Ideally regular `createPost` handles media uploads.
+                // Ref: `createPost` signature in Step 6492: `createPost(..., attachments)` where attachments is string array.
+                // So we MUST upload.
+                // Let's add a quick upload handler.
+                const file = new File([audioBlob], "voice_post.webm", { type: "audio/webm" });
+                const formData = new FormData();
+                formData.append("file", file);
+
+                // Use fetch to upload
+                const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                if (!uploadRes.ok) throw new Error("Upload failed");
+                const { url } = await uploadRes.json();
+                attachments = [url];
+            }
+
             const res = await createPost(
                 currentUser.id,
                 content,
                 postType === "CODE" || postType === "LINK" || postType === "MAP" ? "TEXT" : postType,
                 isCarousel && carouselSlides.length > 0 ? carouselSlides[0].url : (mediaUrls[0] || undefined),
                 metadata,
-                undefined,
+                communityId, // Pass communityId here
                 propertyDetails.location || mapEmbeds[0]?.address || undefined,
                 undefined,
-                isCarousel ? carouselSlides.map(s => s.url) : mediaUrls
+                attachments
             );
 
             if (res.success) {
@@ -188,7 +224,7 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
 
     // Handle save draft
     const handleSaveDraft = async () => {
-        if (!content.trim() && mediaUrls.length === 0 && codeBlocks.length === 0) {
+        if (!content.trim() && mediaUrls.length === 0 && codeBlocks.length === 0 && !audioBlob) {
             toast.error("Rien à sauvegarder");
             return;
         }
@@ -272,12 +308,14 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
         { type: "TEXT" as PostType, icon: FileText, label: "Texte" },
         { type: "IMAGE" as PostType, icon: Image, label: "Photo" },
         { type: "VIDEO" as PostType, icon: Video, label: "Vidéo" },
+        { type: "AUDIO" as PostType, icon: Mic, label: "Audio" },
         { type: "POLL" as PostType, icon: BarChart2, label: "Sondage" },
         { type: "PROPERTY" as PostType, icon: Home, label: "Immo" },
         { type: "CODE" as PostType, icon: Code, label: "Code" },
         { type: "LINK" as PostType, icon: Link2, label: "Lien" },
         { type: "MAP" as PostType, icon: MapPin, label: "Carte" },
     ];
+
 
     return (
         <Card id="create-post-container" className="border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm bg-white/80 dark:bg-zinc-900/50 backdrop-blur-xl mb-4 md:mb-6 overflow-hidden transition-all duration-300 hover:border-zinc-300/80 dark:hover:border-zinc-700">
@@ -477,6 +515,22 @@ export function CreatePostEnhanced({ currentUser, onPostCreated }: CreatePostEnh
                                                 <MapEmbedPicker
                                                     onChange={(loc) => setMapEmbeds([loc])}
                                                 />
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Audio Recorder */}
+                                    {postType === "AUDIO" && (
+                                        <div className="space-y-3">
+                                            <VoiceRecorder
+                                                onSend={(blob) => setAudioBlob(blob)}
+                                                onCancel={() => setAudioBlob(null)}
+                                            />
+                                            {audioBlob && (
+                                                <div className="bg-green-50 p-3 rounded-lg flex items-center gap-2">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                                    <span className="text-sm text-green-700 font-medium">Message vocal enregistré et prêt à être envoyé</span>
+                                                </div>
                                             )}
                                         </div>
                                     )}

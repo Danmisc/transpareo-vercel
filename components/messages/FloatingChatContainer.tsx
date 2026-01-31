@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X, Minus, Maximize2, Send, Paperclip, Smile, Mic,
@@ -15,7 +16,8 @@ import { useFloatingChat, ChatWindow } from "./FloatingChatProvider";
 import { getMessages, sendMessage } from "@/lib/services/messaging.service";
 import { useSession } from "next-auth/react";
 import { pusherClient } from "@/lib/pusher";
-import { format } from "date-fns";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 // Minimized bubble component
 function MinimizedBubble({ chat, onClick }: { chat: ChatWindow; onClick: () => void }) {
@@ -306,8 +308,10 @@ function ExpandedChatWindow({ chat }: { chat: ChatWindow }) {
 // Main floating chat container
 export function FloatingChatContainer() {
     const { openChats, maximizeChat, isEnabled } = useFloatingChat();
+    const pathname = usePathname();
 
     if (!isEnabled) return null;
+    if (pathname?.startsWith("/messages")) return null;
 
     // Separate minimized and expanded chats
     const minimizedChats = openChats.filter(c => c.isMinimized);

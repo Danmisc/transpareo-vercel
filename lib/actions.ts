@@ -343,6 +343,22 @@ export async function createPost(
             visibility = formData.get('visibility') as string || "PUBLIC";
         }
 
+        const communityId = formData?.get('communityId') as string || undefined;
+
+        if (communityId) {
+            const banned = await prisma.communityBannedUser.findUnique({
+                where: {
+                    communityId_userId: {
+                        communityId,
+                        userId
+                    }
+                }
+            });
+            if (banned) {
+                return { success: false, error: "Vous êtes banni de cette communauté." };
+            }
+        }
+
         const post = await prisma.post.create({
             data: {
                 content,
@@ -415,6 +431,16 @@ export async function createPost(
                     "a publié un nouveau post."
                 )
             ));
+        }
+
+        if (post.communityId) {
+            const community = await prisma.community.findUnique({
+                where: { id: post.communityId },
+                select: { slug: true }
+            });
+            if (community) {
+                revalidatePath(`/communities/${community.slug}`);
+            }
         }
 
         revalidatePath("/");
@@ -544,6 +570,29 @@ export async function stopLiveStream(liveStreamId: string) {
 
 export async function addComment(postId: string, userId: string, content: string, parentId?: string, media?: string) {
     try {
+        // Fetch post to check community and existence
+        const post = await prisma.post.findUnique({
+            where: { id: postId },
+            select: { communityId: true, authorId: true }
+        });
+
+        if (!post) return { success: false, error: "Post not found" };
+
+        // Check Ban
+        if (post.communityId) {
+            const banned = await prisma.communityBannedUser.findUnique({
+                where: {
+                    communityId_userId: {
+                        communityId: post.communityId,
+                        userId
+                    }
+                }
+            });
+            if (banned) {
+                return { success: false, error: "Vous êtes banni de cette communauté." };
+            }
+        }
+
         // ... (moderation check unchanged)
         const moderation = await moderationService.analyzeText(content);
         if (moderation.flagged) {
@@ -576,17 +625,17 @@ export async function addComment(postId: string, userId: string, content: string
         });
 
         // Notify Post Author
-        if (comment.post.authorId !== userId) {
-            await createNotification(comment.post.authorId, "COMMENT", userId, postId, comment.id, content.substring(0, 50));
+        if (post.authorId !== userId) {
+            await createNotification(post.authorId, "COMMENT", userId, postId, comment.id, content.substring(0, 50));
             // Gamification: "Recevoir un commentaire" (+ points for post author)
-            await handleAction(comment.post.authorId, "COMMENT_CREATED");
+            await handleAction(post.authorId, "COMMENT_CREATED");
         }
 
         // Notify Parent Comment Author (if reply)
         if (parentId && comment.parent && comment.parent.userId !== userId) {
             // If parent author is same as post author, maybe don't double notify? Or strictly separate types?
             // Let's notify separatedly as "REPLY"
-            if (comment.parent.userId !== comment.post.authorId) {
+            if (comment.parent.userId !== post.authorId) {
                 await createNotification(comment.parent.userId, "REPLY", userId, postId, comment.id, content.substring(0, 50));
             }
         }

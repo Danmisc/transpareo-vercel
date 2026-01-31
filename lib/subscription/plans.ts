@@ -80,7 +80,7 @@ export interface Plan {
 export const PLAN_FEATURES: Record<PlanName, PlanFeatures> = {
     FREE: {
         // Messages
-        messages_per_day: 10,
+        messages_per_day: -1,
         group_messages: false,
         inmails_per_month: 0,
         scheduled_messages: false,

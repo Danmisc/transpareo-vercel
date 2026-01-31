@@ -52,13 +52,21 @@ export function CreateGroupDialog({
     };
 
     const handleCreate = async () => {
-        if (!groupName || selectedUsers.length === 0 || !session?.user?.id) return;
+        if (selectedUsers.length === 0 || !session?.user?.id) return;
+
+        // Validation for Group
+        if (selectedUsers.length > 1 && !groupName) {
+            return; // Needs name for group
+        }
+
         setLoading(true);
+
+        const isGroup = selectedUsers.length > 1 || !!groupName;
 
         const res = await createConversation(
             [session.user.id, ...selectedUsers],
-            true, // isGroup
-            groupName
+            isGroup,
+            isGroup ? groupName : undefined
         );
 
         if (res.success && res.data) {
@@ -66,16 +74,19 @@ export function CreateGroupDialog({
             const newConv = {
                 id: res.data.id,
                 name: res.data.name,
-                isGroup: true,
+                isGroup: res.data.isGroup,
                 avatar: null,
-                lastMessage: "Group created",
+                lastMessage: isGroup ? "Groupe créé" : "Nouvelle discussion",
                 lastMessageAt: new Date(),
-                unreadCount: 0
+                unreadCount: 0,
+                // Add participants for 1:1 name resolution
+                participants: res.data.participants
             };
             onSuccess(newConv);
             router.push(`/messages/${res.data.id}`);
+            onOpenChange(false);
         } else {
-            console.error("Failed to create group");
+            console.error("Failed to create conversation");
         }
         setLoading(false);
     };
@@ -84,16 +95,16 @@ export function CreateGroupDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Créer un groupe</DialogTitle>
+                    <DialogTitle>Nouvelle conversation</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="name">Nom du groupe</Label>
+                        <Label htmlFor="name">Nom du groupe <span className="text-zinc-400 font-normal text-xs">(Optionnel pour 1 personne)</span></Label>
                         <Input
                             id="name"
                             value={groupName}
                             onChange={(e) => setGroupName(e.target.value)}
-                            placeholder="Ex: Team Projet Immo"
+                            placeholder="Ex: Team Projet"
                         />
                     </div>
 
@@ -134,8 +145,12 @@ export function CreateGroupDialog({
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleCreate} disabled={!groupName || selectedUsers.length === 0 || loading} className="bg-orange-500 hover:bg-orange-600">
-                        {loading ? "Création..." : "Créer le groupe"}
+                    <Button
+                        onClick={handleCreate}
+                        disabled={selectedUsers.length === 0 || loading || (selectedUsers.length > 1 && !groupName)}
+                        className="bg-orange-500 hover:bg-orange-600"
+                    >
+                        {loading ? "Création..." : (selectedUsers.length > 1 || groupName) ? "Créer le groupe" : "Démarrer la discussion"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

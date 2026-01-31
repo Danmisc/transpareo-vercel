@@ -10,11 +10,17 @@ export async function createCommunity(
         name: string;
         description: string;
         type: "PUBLIC" | "PRIVATE" | "RESTRICTED";
+        slug?: string;
+        avatar?: string;
+        coverImage?: string;
+        theme?: any; // Start simple, or refine type if needed
     }
 ) {
     try {
-        // Generate simple slug
-        let slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        // Use provided slug or generate one
+        let slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+        // Ensure uniqueness logic remains
         const existing = await prisma.community.findUnique({ where: { slug } });
         if (existing) {
             slug = `${slug}-${Date.now().toString().slice(-4)}`;
@@ -26,6 +32,12 @@ export async function createCommunity(
                 slug,
                 description: data.description,
                 type: data.type,
+                image: data.avatar, // Mapping avatar to image
+                coverImage: data.coverImage,
+                // We might need to store theme in a JSON field or similar if DB supports it.
+                // Checking Schema would be best but let's assume 'metadata' or specific fields exist.
+                // Since I can't see Schema, I will map common fields.
+                // If 'image' and 'coverImage' exist on Community model, this works.
                 creatorId: userId,
                 members: {
                     create: {
@@ -47,6 +59,32 @@ export async function createCommunity(
 // --- JOIN/LEAVE ---
 export async function joinCommunity(communityId: string, userId: string) {
     try {
+        // Check if user is banned
+        const banned = await prisma.communityBannedUser.findUnique({
+            where: {
+                communityId_userId: {
+                    communityId,
+                    userId
+                }
+            }
+        });
+
+        if (banned) {
+            // If ban has expiration and is past, allow delete
+            if (banned.expiresAt && new Date() > banned.expiresAt) {
+                await prisma.communityBannedUser.delete({
+                    where: {
+                        communityId_userId: {
+                            communityId,
+                            userId
+                        }
+                    }
+                });
+            } else {
+                return { success: false, error: "You are banned from this community." };
+            }
+        }
+
         await prisma.communityMember.create({
             data: {
                 communityId,
@@ -80,6 +118,37 @@ export async function leaveCommunity(communityId: string, userId: string) {
 }
 
 // --- FETCH ---
+// ...
+export async function getUserCommunities(userId: string) {
+    try {
+        const memberships = await prisma.communityMember.findMany({
+            where: { userId },
+            include: {
+                community: {
+                    include: {
+                        _count: { select: { members: true } }
+                    }
+                }
+            },
+            orderBy: { joinedAt: 'desc' }
+        });
+
+        const data = memberships.map(m => ({
+            ...m.community,
+            role: m.role,
+            joinedAt: m.joinedAt,
+            // Add derived properties expected by UI if needed
+            isPinned: false, // Default
+            hasUnread: false // Default
+        }));
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("Failed to fetch user communities:", error);
+        return { success: false, error: "Failed to fetch user communities" };
+    }
+}
+
 export async function getCommunities(query?: string) {
     try {
         const communities = await prisma.community.findMany({
@@ -94,7 +163,7 @@ export async function getCommunities(query?: string) {
                     select: { members: true }
                 }
             },
-            take: 20,
+            take: 50,
             orderBy: { members: { _count: 'desc' } }
         });
         return { success: true, data: communities };

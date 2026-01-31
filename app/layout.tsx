@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google"; // Using Inter for now, can swap to Outfit
 import "./globals.css";
+import NextTopLoader from "nextjs-toploader";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,6 +38,17 @@ export default async function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
+        <NextTopLoader
+          color="#f97316"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #f97316,0 0 5px #f97316"
+        />
         <Providers session={session}>
           <PresenceProvider>
             <FloatingChatProvider userId={userId} enabled={!!userId}>

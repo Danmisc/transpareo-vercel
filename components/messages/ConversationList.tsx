@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, PenSquare, CheckCheck, Users, Plus, Hash, Lock, MessageCircle, Home } from "lucide-react";
+import { Search, PenSquare, CheckCheck, Users, Plus, Hash, Lock, MessageCircle, Home, ArrowLeft } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
@@ -15,15 +15,28 @@ import { usePresence } from "@/components/providers/PresenceProvider";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { CreateChannelDialog } from "./CreateChannelDialog";
 import { Button } from "@/components/ui/button";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 export function ConversationList() {
     const { data: session } = useSession();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
     const { onlineUsers } = usePresence();
+
     const [conversations, setConversations] = useState<any[]>([]);
     const [search, setSearch] = useState("");
-    const [activeTab, setActiveTab] = useState<"chat" | "channels">("chat");
+
+    const activeTab = searchParams.get("tab") === "channels" ? "channels" : "chat";
+
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({}); // convId -> userNames[]
     const subscribedIds = useRef(new Set<string>());
+
+    const handleTabChange = (tab: "chat" | "channels") => {
+        // preserve other params? No, just switch tab
+        router.push(`${pathname}?tab=${tab}`);
+    };
 
     useEffect(() => {
         async function load() {
@@ -39,9 +52,37 @@ export function ConversationList() {
     useEffect(() => {
         if (!session?.user?.id) return;
 
+        // Listen for NEW conversations (Realtime Sidebar Update)
+        const userChannel = pusherClient.subscribe(`private-user-${session.user.id}`);
+        userChannel.bind("conversation:new", (data: any) => {
+            setConversations(prev => {
+                if (prev.find(c => c.id === data.id)) return prev;
+
+                // Format new conversation for list
+                const other = data.participants?.find((p: any) => p.userId !== session.user.id)?.user;
+                let name = data.name;
+                let avatar = data.image;
+
+                if (!data.isGroup && other) {
+                    name = other.name || "Utilisateur";
+                    avatar = other.avatar || other.image || "/avatars/default.svg";
+                }
+
+                const newConv = {
+                    ...data,
+                    name,
+                    avatar,
+                    unreadCount: 0,
+                    unread: false,
+                    lastMessage: data.isGroup ? "Groupe créé" : "Nouvelle discussion",
+                    lastMessageAt: data.createdAt
+                };
+                return [newConv, ...prev];
+            });
+        });
+
         conversations.forEach(c => {
             if (subscribedIds.current.has(c.id)) return;
-
             subscribedIds.current.add(c.id);
             const channel = pusherClient.subscribe(`private-conversation-${c.id}`);
 
@@ -75,6 +116,24 @@ export function ConversationList() {
                     }));
                 }
             });
+
+            // Typing Indicators
+            channel.bind("client-typing", (data: { user: string }) => {
+                if (!data.user || (session?.user?.name && data.user === session.user.name)) return;
+
+                setTypingUsers(prev => ({
+                    ...prev,
+                    [c.id]: [...(prev[c.id] || []), data.user]
+                }));
+
+                // Clear after 3s
+                setTimeout(() => {
+                    setTypingUsers(prev => ({
+                        ...prev,
+                        [c.id]: (prev[c.id] || []).filter(u => u !== data.user)
+                    }));
+                }, 3000);
+            });
         });
 
         // Cleanup on unmount only
@@ -95,46 +154,46 @@ export function ConversationList() {
     });
 
     return (
-        <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl relative">
+        <div className="flex flex-col h-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl relative">
             {/* Header */}
-            <div className="p-4 flex flex-col gap-4 sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-zinc-100">
+            <div className="p-4 flex flex-col gap-4 sticky top-0 z-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-zinc-900 tracking-tight">
-                        {activeTab === "chat" ? "Messages" : "Salons"}
-                    </h1>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                         <Link href="/">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="hidden md:flex rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                                className="hidden md:flex rounded-full -ml-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
                                 title="Retour à l'accueil"
                             >
-                                <Home size={18} />
+                                <ArrowLeft size={20} />
                             </Button>
                         </Link>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-                            onClick={() => setIsCreateOpen(true)}
-                        >
-                            <Plus size={18} />
-                        </Button>
+                        <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+                            {activeTab === "chat" ? "Messages" : "Salons"}
+                        </h1>
                     </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                        onClick={() => setIsCreateOpen(true)}
+                    >
+                        <Plus size={18} />
+                    </Button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex p-1 bg-zinc-100 rounded-xl relative">
+                <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl relative">
                     <button
-                        onClick={() => setActiveTab("chat")}
-                        className={cn("flex-1 text-sm font-medium py-1.5 rounded-lg transition-all flex items-center justify-center gap-2", activeTab === "chat" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}
+                        onClick={() => handleTabChange("chat")}
+                        className={cn("flex-1 text-sm font-medium py-1.5 rounded-lg transition-all flex items-center justify-center gap-2", activeTab === "chat" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300")}
                     >
                         <MessageCircle size={14} /> Chats
                     </button>
                     <button
-                        onClick={() => setActiveTab("channels")}
-                        className={cn("flex-1 text-sm font-medium py-1.5 rounded-lg transition-all flex items-center justify-center gap-2", activeTab === "channels" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}
+                        onClick={() => handleTabChange("channels")}
+                        className={cn("flex-1 text-sm font-medium py-1.5 rounded-lg transition-all flex items-center justify-center gap-2", activeTab === "channels" ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300")}
                     >
                         <Hash size={14} /> Salons
                     </button>
@@ -168,13 +227,13 @@ export function ConversationList() {
                         placeholder={activeTab === "chat" ? "Rechercher une discussion..." : "Rechercher un salon..."}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="bg-zinc-100 border-none pl-9 h-10 rounded-xl text-zinc-900 placeholder:text-zinc-500 focus-visible:ring-1 focus-visible:ring-orange-500/20 transition-all font-medium"
+                        className="bg-zinc-100 dark:bg-zinc-800 border-none pl-9 h-10 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus-visible:ring-1 focus-visible:ring-orange-500/20 transition-all font-medium"
                     />
                 </div>
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-200 scrollbar-track-transparent space-y-1 p-2">
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent space-y-1 p-2">
                 {filtered.map((conv) => {
                     // Logic for online status
                     let isOnline = false;
@@ -191,6 +250,7 @@ export function ConversationList() {
                             data={conv}
                             isActive={false} // Logic for active state needs URL check, simplified
                             isOnline={isOnline}
+                            typingUsers={typingUsers[conv.id] || []}
                             onClick={() => { }}
                         />
                     );
@@ -216,7 +276,7 @@ export function ConversationList() {
     );
 }
 
-function ConversationItem({ data, isActive, isOnline, onClick }: { data: any, isActive: boolean, isOnline?: boolean, onClick: () => void }) {
+function ConversationItem({ data, isActive, isOnline, typingUsers, onClick }: { data: any, isActive: boolean, isOnline?: boolean, typingUsers?: string[], onClick: () => void }) {
     const isChannel = data.type?.startsWith("CHANNEL");
 
     return (
@@ -225,16 +285,16 @@ function ConversationItem({ data, isActive, isOnline, onClick }: { data: any, is
             onClick={onClick}
             className={cn(
                 "flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 group relative overflow-hidden",
-                isActive ? "bg-orange-50 border border-orange-100/50 shadow-sm" : "hover:bg-zinc-50 border border-transparent"
+                isActive ? "bg-orange-50 dark:bg-orange-500/10 border border-orange-100/50 dark:border-orange-500/20 shadow-sm" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border border-transparent"
             )}
         >
             {/* Active Indicator Glow */}
-            {isActive && <div className="absolute inset-0 bg-orange-500/5 blur-xl rounded-2xl -z-10" />}
+            {isActive && <div className="absolute inset-0 bg-orange-500/5 dark:bg-orange-500/10 blur-xl rounded-2xl -z-10" />}
 
             <div className="relative flex-shrink-0">
-                <Avatar className="w-12 h-12 border border-zinc-100 shadow-sm">
+                <Avatar className="w-12 h-12 border border-zinc-100 dark:border-zinc-800 shadow-sm">
                     <AvatarImage src={data.avatar} />
-                    <AvatarFallback className={cn("text-xs font-bold", (data.isGroup || isChannel) ? "bg-blue-50 text-blue-600" : "bg-zinc-100 text-zinc-500")}>
+                    <AvatarFallback className={cn("text-xs font-bold", (data.isGroup || isChannel) ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400")}>
                         {isChannel ? (data.type === "CHANNEL_PRIVATE" ? <Lock size={16} /> : <Hash size={16} />) :
                             data.isGroup ? <Users size={16} /> :
                                 data.name?.[0]?.toUpperCase()}
@@ -242,17 +302,17 @@ function ConversationItem({ data, isActive, isOnline, onClick }: { data: any, is
                 </Avatar>
                 {/* Online Indicator */}
                 {isOnline && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full transition-all animate-bounce-in" />
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-zinc-900 rounded-full transition-all animate-bounce-in" />
                 )}
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                 <div className="flex justify-between items-baseline">
-                    <span className={cn("text-sm font-semibold truncate transition-colors", isActive ? "text-zinc-900" : "text-zinc-700")}>
+                    <span className={cn("text-sm font-semibold truncate transition-colors", isActive ? "text-zinc-900 dark:text-white" : "text-zinc-700 dark:text-zinc-200")}>
                         {data.name}
                     </span>
                     {data.lastMessageAt && (
-                        <span className={cn("text-[10px] font-medium shrink-0", data.unread > 0 ? "text-orange-500" : "text-zinc-400")}>
+                        <span className={cn("text-[10px] font-medium shrink-0", data.unread > 0 ? "text-orange-500" : "text-zinc-400 dark:text-zinc-500")}>
                             {formatDistanceToNow(new Date(data.lastMessageAt), { addSuffix: false, locale: fr })}
                         </span>
                     )}
@@ -261,9 +321,12 @@ function ConversationItem({ data, isActive, isOnline, onClick }: { data: any, is
                 <div className="flex justify-between items-center">
                     <p className={cn(
                         "text-xs truncate max-w-[80%]",
-                        data.unread > 0 ? "text-zinc-900 font-bold" : "text-zinc-500 font-normal"
+                        (data.unread > 0 || (typingUsers && typingUsers.length > 0)) ? "text-zinc-900 dark:text-white font-bold" : "text-zinc-500 dark:text-zinc-400 font-normal",
+                        (typingUsers && typingUsers.length > 0) && "text-orange-500"
                     )}>
-                        {data.lastMessage}
+                        {typingUsers && typingUsers.length > 0
+                            ? `${typingUsers.join(", ")} écrit...`
+                            : data.lastMessage}
                     </p>
 
                     {data.unreadCount > 0 ? (

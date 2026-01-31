@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useCall } from "@/components/calls/CallProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Phone, Video, Info, Image as ImageIcon, Mic, Send, Smile, Paperclip, ArrowLeft, Users, Hash, Lock, X, Pin, Reply } from "lucide-react";
+import { Phone, Video, Info, Image as ImageIcon, Mic, Send, Smile, Paperclip, ArrowLeft, Users, Hash, Lock, X, Pin, Reply, Trash2, Edit2, MoreHorizontal, MoreVertical, Search } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
-import { getMessages, sendMessage, getConversationById, markMessagesAsRead, updateGroupInfo, updateParticipantRole, removeParticipant, getPinnedMessages, pinMessage, unpinMessage } from "@/lib/services/messaging.service";
+import { fr } from "date-fns/locale";
+import { getMessages, sendMessage, getConversationById, markMessagesAsRead, updateGroupInfo, updateParticipantRole, removeParticipant, getPinnedMessages, pinMessage, unpinMessage, searchMessages, fetchMessageContext } from "@/lib/services/messaging.service";
 import { uploadFiles } from "@/lib/upload";
 import imageCompression from "browser-image-compression";
 import { pusherClient } from "@/lib/pusher";
@@ -19,9 +21,13 @@ import { useRouter } from "next/navigation";
 import { GroupSettings } from "./GroupSettings";
 import { usePresence } from "@/components/providers/PresenceProvider";
 import { MessageItem } from "@/components/messages/MessageItem";
+import { AdvancedChatSearch } from "./AdvancedChatSearch";
+import { SearchResultsSidebar } from "./SearchResultsSidebar";
 import { ChatInput } from "@/components/messages/ChatInput";
 import { SharedMediaSheet } from "../conversation/SharedMediaSheet";
 import { ThreadView } from "./ThreadView";
+import { TypingBubble } from "./TypingBubble";
+
 
 export default function ChatWindow({ conversationId }: { conversationId: string }) {
     const { data: session } = useSession();
@@ -33,65 +39,110 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
     const [replyingTo, setReplyingTo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
+
+    // In-Chat Search
+    // In-Chat Search
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearchLoading, setIsSearchLoading] = useState(false);
+    const [isContextView, setIsContextView] = useState(false);
+
     const [showMediaSheet, setShowMediaSheet] = useState(false);
+    const [showScrollButton, setShowScrollButton] = useState(false);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 300; // Show if >300px from bottom
+        setShowScrollButton(!isNearBottom);
+    };
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
     const [threadMessage, setThreadMessage] = useState<any>(null);
+    const typingTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
     // Initial Load
     useEffect(() => {
         async function load() {
             if (!session?.user?.id) return;
 
-            // Parallel fetch
-            const [msgsRes, convRes, pinnedRes] = await Promise.all([
-                getMessages(conversationId),
-                getConversationById(conversationId, session.user.id),
-                getPinnedMessages(conversationId)
-            ]);
+            setLoading(true);
+            try {
+                // Parallel fetch
+                const [msgsRes, convRes, pinnedRes] = await Promise.all([
+                    getMessages(conversationId),
+                    getConversationById(conversationId, session.user.id),
+                    getPinnedMessages(conversationId)
+                ]);
 
-            if (msgsRes.success && msgsRes.data) {
-                const mapMessage = (m: any) => ({
-                    id: m.id,
-                    sender: m.senderId === session?.user?.id ? "me" : "other",
-                    senderId: m.senderId,
-                    senderName: m.sender.name,
-                    senderAvatar: m.sender.avatar || m.sender.image,
-                    content: m.content,
-                    time: new Date(m.createdAt),
-                    type: m.type === "IMAGE" ? "image" : "text",
-                    image: m.image,
-                    isDeleted: m.isDeleted,
-                    isEdited: m.isEdited,
-                    isRead: m.readStatuses?.some((r: any) => r.userId !== session?.user?.id) || false,
-                    readStatuses: m.readStatuses || [],
-                    reactions: m.reactions || [],
-                    attachments: m.attachments || [],
-                    replyTo: m.replyTo,
-                    replyToId: m.replyToId,
-                    isPinned: m.isPinned,
-                    replies: m.replies || [],
-                    conversationId: conversationId
-                });
-                const mapped = msgsRes.data.map(mapMessage);
-                setMessages(mapped);
-                // Mark as read immediately
-                markMessagesAsRead(conversationId, session.user.id);
+                if (msgsRes.success && msgsRes.data) {
+                    const mapMessage = (m: any) => ({
+                        id: m.id,
+                        sender: m.senderId === session?.user?.id ? "me" : "other",
+                        senderId: m.senderId,
+                        senderName: m.sender.name,
+                        senderAvatar: m.sender.avatar || m.sender.image,
+                        content: m.content,
+                        time: new Date(m.createdAt),
+                        type: m.type === "IMAGE" ? "image" : "text",
+                        image: m.image,
+                        isDeleted: m.isDeleted,
+                        isEdited: m.isEdited,
+                        isRead: m.readStatuses?.some((r: any) => r.userId !== session?.user?.id) || false,
+                        readStatuses: m.readStatuses || [],
+                        reactions: m.reactions || [],
+                        attachments: m.attachments || [],
+                        replyTo: m.replyTo,
+                        replyToId: m.replyToId,
+                        isPinned: m.isPinned,
+                        replies: m.replies || [],
+                        conversationId: conversationId
+                    });
+                    const mapped = msgsRes.data.map(mapMessage);
+                    setMessages(mapped);
+                    markMessagesAsRead(conversationId, session.user.id);
+                }
+
+                if (convRes.success && convRes.data) {
+                    setConversation(convRes.data);
+                    const pinned = convRes.data.messages?.filter((m: any) => m.isPinned) || [];
+                    setPinnedMessages(pinned);
+                }
+
+                if (pinnedRes.success && pinnedRes.data) {
+                    setPinnedMessages(pinnedRes.data);
+                }
+            } catch (error) {
+                console.error("Failed to load conversation", error);
+            } finally {
+                setLoading(false);
             }
-
-            if (convRes.success && convRes.data) {
-                setConversation(convRes.data);
-            }
-
-            if (pinnedRes.success && pinnedRes.data) {
-                setPinnedMessages(pinnedRes.data);
-            }
-
-            setLoading(false);
         }
         load();
     }, [conversationId, session?.user?.id]);
 
-    const [typingUsers, setTypingUsers] = useState<string[]>([]);
+    // Force scroll to bottom on load
+    useEffect(() => {
+        if (!loading) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        }
+    }, [loading, conversationId]);
+
+    // Scroll to bottom when I send a message
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg.senderId === session?.user?.id) {
+                scrollToBottom();
+            }
+        }
+    }, [messages.length, session?.user?.id]);
+
+    const [typingUsers, setTypingUsers] = useState<{ id: string, name: string, avatar?: string }[]>([]);
     const processingTyping = useRef(false);
 
     // Real-time Subscription (Pusher)
@@ -100,24 +151,39 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
         const channel = pusherClient.subscribe(channelName);
 
         channel.bind("message:new", (data: any) => {
+            const isMe = data.senderId === session?.user?.id;
+
+            // Skip if this is my own message - it's already handled via optimistic UI
+            // Skip if this is my own message - it's already handled via optimistic UI
+            if (isMe) return;
+
+            // Remove sender from typing users IMMEDIATELY upon receiving message
+            if (data.senderId) {
+                setTypingUsers(prev => prev.filter(u => u.id !== data.senderId));
+            }
+
+            // Play Receive Sound
+            import("@/components/ui/sound-effects").then(({ soundEffects }) => {
+                soundEffects.playReceive();
+            });
+
+            // Mark as read since we received it
+            if (session?.user?.id) {
+                markMessagesAsRead(conversationId, session.user.id);
+            }
+
             setMessages((prev) => {
                 if (prev.find(m => m.id === data.id)) return prev;
-                // Remove sender from typing users if message received
-                if (data.senderName) {
-                    setTypingUsers(prev => prev.filter(u => u !== data.senderName));
-                }
 
-                const isMe = data.senderId === session?.user?.id;
+                // Mark as read since we received it
 
-                // If I received a message, mark as read
-                if (!isMe && session?.user?.id) {
-                    markMessagesAsRead(conversationId, session.user.id);
-                }
 
                 const newMessage = {
                     id: data.id,
-                    sender: isMe ? "me" : "other",
+                    sender: "other",
+                    senderId: data.senderId,
                     senderName: data.sender?.name,
+                    senderAvatar: data.sender?.avatar || data.sender?.image,
                     content: data.content,
                     time: new Date(data.createdAt),
                     type: data.type === "IMAGE" ? "image" : "text",
@@ -136,6 +202,7 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
         });
 
         channel.bind("message:update", (data: any) => {
+            // ... existing code ...
             setMessages((prev) => prev.map(m => {
                 if (m.id === data.id) {
                     return {
@@ -170,16 +237,26 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
             }
         });
 
-        channel.bind("client-typing", (data: { user: string }) => {
+        channel.bind("client-typing", (data: { user: string, avatar?: string, id: string }) => {
             if (!data.user) return;
+            if (data.id === session?.user?.id) return; // Ignore my own typing
+
+            // Clear existing timeout to prevent premature removal
+            if (typingTimeoutsRef.current[data.id]) {
+                clearTimeout(typingTimeoutsRef.current[data.id]);
+            }
+
             setTypingUsers(prev => {
-                if (!prev.includes(data.user)) return [...prev, data.user];
+                if (!prev.find(u => u.name === data.user)) {
+                    return [...prev, { name: data.user, avatar: data.avatar, id: data.id }];
+                }
                 return prev;
             });
 
-            // Clear after 3 seconds
-            setTimeout(() => {
-                setTypingUsers(prev => prev.filter(u => u !== data.user));
+            // Set new timeout (debounce)
+            typingTimeoutsRef.current[data.id] = setTimeout(() => {
+                setTypingUsers(prev => prev.filter(u => u.name !== data.user));
+                delete typingTimeoutsRef.current[data.id];
             }, 3000);
         });
 
@@ -197,6 +274,8 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
 
         return () => {
             pusherClient.unsubscribe(channelName);
+            // Clear all timeouts on unmount
+            Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
         };
     }, [conversationId, session?.user?.id]);
 
@@ -204,9 +283,20 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
         if (processingTyping.current) return;
         processingTyping.current = true;
 
-        const channel = pusherClient.subscribe(`private-conversation-${conversationId}`);
         if (session?.user?.name) {
-            channel.trigger("client-typing", { user: session.user.name });
+            fetch("/api/pusher/trigger", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    channel: `private-conversation-${conversationId}`,
+                    event: "client-typing",
+                    data: {
+                        user: session.user.name,
+                        avatar: session.user.image,
+                        id: session.user.id
+                    }
+                })
+            }).catch(e => console.error("Failed to trigger typing", e));
         }
 
         setTimeout(() => {
@@ -246,6 +336,7 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
         const optimisticMsg = {
             id: optimisticId,
             sender: "me",
+            senderId: session.user.id,
             senderName: session.user.name,
             content: content,
             time: new Date(),
@@ -323,6 +414,7 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
                 const mapped: any = {
                     id: res.data.id,
                     sender: "me",
+                    senderId: res.data.senderId || session.user.id,
                     senderName: res.data.sender?.name || session?.user?.name || "Me",
                     content: res.data.content,
                     time: new Date(res.data.createdAt),
@@ -389,188 +481,396 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
     const display = getDisplayInfo();
     const isChannel = display.type?.startsWith("CHANNEL");
 
-    return (
-        <div className="flex flex-col h-full w-full relative bg-white">
-            {/* Header */}
-            <div className="h-16 px-4 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-zinc-100 sticky top-0 z-30 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <Link href="/messages" className="md:hidden p-2 -ml-2 mr-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors">
-                        <ArrowLeft size={20} />
-                    </Link>
-                    <Avatar className="h-10 w-10 border border-zinc-200 ring-2 ring-transparent hover:ring-orange-100 transition-all cursor-pointer">
-                        <AvatarImage src={display.avatar} />
-                        <AvatarFallback className={cn("text-orange-600", (display.isGroup || isChannel) ? "bg-blue-50 text-blue-600" : "bg-orange-50")}>
-                            {isChannel ? (display.type === "CHANNEL_PRIVATE" ? <Lock size={18} /> : <Hash size={18} />) :
-                                display.isGroup ? <Users size={18} /> :
-                                    display.name?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col cursor-pointer">
-                        <span className="text-sm font-bold text-zinc-900 leading-none hover:underline">{display.name}</span>
-                        <span className="text-[10px] text-zinc-500 font-medium flex items-center gap-1 line-clamp-1 max-w-[200px]">
-                            {display.isOnline && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
-                            <span className={display.isOnline ? "text-green-600 font-semibold" : ""}>{display.status}</span>
-                        </span>
-                    </div>
-                </div>
+    // Aliases and Helpers for Render Compatibility
+    const isLoading = loading;
+    const conversationName = display.name;
+    const conversationType = display.type;
+    const currentUserId = session?.user?.id;
+    const otherParticipant = conversation?.participants?.find((p: any) => p.userId !== session?.user?.id)?.user;
 
-                <div className="flex items-center gap-1 text-zinc-400">
-                    {(display.isGroup || isChannel) && (
-                        <GroupSettings
-                            conversation={conversation}
-                            currentUserId={session?.user?.id || ""}
-                            currentUserRole={conversation.participants.find((p: any) => p.userId === session?.user?.id)?.role || "MEMBER"}
-                            onUpdate={async (data) => {
-                                await updateGroupInfo(conversationId, data);
-                                setConversation((prev: any) => ({ ...prev, ...data }));
-                            }}
-                            onLeave={async () => {
-                                if (!session?.user?.id) return;
-                                await removeParticipant(conversationId, session.user.id);
-                                router.push('/messages');
-                            }}
-                            onPromote={async (userId) => {
-                                if (!session?.user?.id) return;
-                                await updateParticipantRole(conversationId, userId, "ADMIN");
-                                // Refresh
-                                const res = await getConversationById(conversationId, session.user.id);
-                                if (res.success) setConversation(res.data);
-                            }}
-                            onKick={async (userId) => {
-                                if (!session?.user?.id) return;
-                                await removeParticipant(conversationId, userId);
-                                // Refresh
-                                const res = await getConversationById(conversationId, session.user.id);
-                                if (res.success) setConversation(res.data);
-                            }}
-                        />
-                    )}
+    const handleSearch = useCallback(async (query: string) => {
+        setSearchQuery(query);
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
 
-                    <Button variant="ghost" size="icon" className="hover:text-orange-600 hover:bg-orange-50 rounded-full" onClick={() => display.id && callUser({ id: display.id, name: display.name, avatar: display.avatar }, false)}><Phone size={20} /></Button>
-                    <Button variant="ghost" size="icon" className="hover:text-orange-600 hover:bg-orange-50 rounded-full" onClick={() => display.id && callUser({ id: display.id, name: display.name, avatar: display.avatar }, true)}><Video size={20} /></Button>
-                    <Button variant="ghost" size="icon" className="hover:text-orange-600 hover:bg-orange-50 rounded-full" onClick={() => setShowMediaSheet(true)}><Info size={20} /></Button>
-                </div>
-            </div>
+        setIsSearchLoading(true);
+        const res = await searchMessages(conversationId, query);
+        if (res.success && res.data) {
+            setSearchResults(res.data);
+        }
+        setIsSearchLoading(false);
+    }, [conversationId]);
 
-            {/* Pinned Messages Banner */}
-            {
-                pinnedMessages.length > 0 && (
-                    <div className="bg-orange-50/90 backdrop-blur-sm px-4 py-2 text-xs flex items-center justify-between border-b border-orange-100 sticky top-[64px] z-20">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
-                            // Optionally scroll to message
-                            document.getElementById(`message - ${pinnedMessages[0].id} `)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}>
-                            <Pin size={12} className="text-orange-500 fill-orange-500" />
-                            <span className="font-semibold text-orange-900">Épinglé:</span>
-                            <span className="text-orange-700 truncate max-w-[200px] md:max-w-[400px]">{pinnedMessages[0].content}</span>
-                        </div>
-                        {/* Only Admin/Mod can unpin, but simplistic UI for now */}
-                    </div>
-                )
+    const handleJumpToMessage = async (msg: any) => {
+        const highlightMessage = (id: string) => {
+            const element = document.getElementById(`message-${id}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.classList.remove('flash-message');
+                void element.offsetWidth; // Force reflow
+                element.classList.add('flash-message');
+                setTimeout(() => {
+                    element.classList.remove('flash-message');
+                }, 3000);
             }
+        };
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-1 relative bg-white" ref={scrollRef}>
-                {!loading && messages.length === 0 && (
-                    <div className="flex h-full items-center justify-center text-zinc-400 text-sm">
-                        Dites bonjour ! 👋
-                    </div>
-                )}
+        const element = document.getElementById(`message-${msg.id}`);
+        if (element) {
+            highlightMessage(msg.id);
+            return;
+        }
 
-                <AnimatePresence initial={false}>
-                    {messages.map((msg, index) => {
-                        const isMe = msg.sender === "me";
-                        const isSequence = index > 0 && messages[index - 1].sender === msg.sender;
+        setIsSearchLoading(true);
+        const res = await fetchMessageContext(conversationId, msg.id);
+        setIsSearchLoading(false);
 
-                        return (
-                            <motion.div
-                                key={msg.id}
-                                id={`message-${msg.id}`}
-                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{ duration: 0.2 }}
-                                className="transition-colors duration-500 rounded-xl"
-                            >
-                                <MessageItem
-                                    message={msg}
-                                    isMe={isMe}
-                                    isSequence={isSequence}
-                                    onReply={(msg: any) => setReplyingTo(msg)}
-                                    onQuoteClick={(id: string) => {
-                                        const el = document.getElementById(`message-${id}`);
-                                        if (el) {
-                                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            // Highlight effect
-                                            el.classList.add('bg-orange-50/50');
-                                            setTimeout(() => el.classList.remove('bg-orange-50/50'), 1000);
-                                        } else {
-                                            // TODO: Fetch older message if not loaded?
-                                            // For now just ignore or show toast
-                                        }
-                                    }}
-                                    onPin={async (msg: any) => {
-                                        if (!session?.user?.id) return;
-                                        if (msg.isPinned) {
-                                            await unpinMessage(msg.id, session.user.id);
-                                        } else {
-                                            await pinMessage(msg.id, session.user.id);
-                                        }
-                                    }}
-                                    onThread={(msg: any) => {
-                                        setThreadMessage({
-                                            id: msg.id,
-                                            content: msg.content,
-                                            senderId: msg.senderId,
-                                            senderName: msg.senderName,
-                                            senderAvatar: msg.senderAvatar,
-                                            createdAt: msg.time,
-                                            conversationId: conversationId,
-                                            repliesCount: msg.replies?.length || 0
-                                        });
-                                    }}
-                                />
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
-            </div>
+        if (res.success && res.data) {
+            setMessages(res.data);
+            setIsContextView(true);
+            setTimeout(() => {
+                highlightMessage(msg.id);
+            }, 300);
+        }
+    };
 
-            {/* Input Area */}
-            <div className="relative z-40">
-                {typingUsers.length > 0 && (
-                    <div className="absolute -top-6 left-4 text-xs text-orange-500 font-medium flex items-center gap-1 h-4 animate-pulse">
-                        <span className="w-1 h-1 bg-orange-500 rounded-full" />
-                        {typingUsers.join(", ")} {typingUsers.length > 1 ? "écrivent..." : "écrit..."}
-                    </div>
-                )}
+    const exitContextView = async () => {
+        setLoading(true);
+        setIsContextView(false);
+        const res = await getMessages(conversationId);
+        if (res.success) setMessages(res.data);
+        setLoading(false);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView(), 100);
+    };
 
-                {replyingTo && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-md border-t border-zinc-100 border-l-4 border-l-orange-500 shadow-sm relative z-50 mx-4 mb-2 rounded-r-lg"
-                    >
-                        <div className="flex flex-col overflow-hidden mr-4">
-                            <span className="text-orange-600 font-bold text-xs flex items-center gap-1">
-                                <Reply size={12} />
-                                Répondre à {replyingTo.senderName}
-                            </span>
-                            <span className="text-zinc-600 text-sm line-clamp-1 truncate mt-0.5">{replyingTo.content || (replyingTo.attachments?.length ? "📎 Pièce jointe" : "Message")}</span>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 hover:bg-zinc-100 rounded-full text-zinc-400" onClick={() => setReplyingTo(null)}>
-                            <X size={14} />
-                        </Button>
-                    </motion.div>
-                )}
+    const scrollToMessage = (id: string) => {
+        document.getElementById(`message-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
 
-                <ChatInput
-                    onSendMessage={handleSendMessage}
-                    triggerTyping={triggerTyping}
-                    replyingTo={replyingTo}
-                    setReplyingTo={setReplyingTo}
+    const handlePinMessage = async (msg: any) => {
+        if (!session?.user?.id) return;
+        if (msg.isPinned) {
+            await unpinMessage(msg.id, session.user.id);
+            setPinnedMessages(prev => prev.filter(p => p.id !== msg.id));
+        } else {
+            await pinMessage(msg.id, session.user.id);
+            setPinnedMessages(prev => [{ ...msg }, ...prev]);
+        }
+    };
+
+    const handleThreadOpen = (msg: any) => {
+        setThreadMessage({
+            id: msg.id,
+            content: msg.content,
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            senderAvatar: msg.senderAvatar,
+            createdAt: msg.time,
+            conversationId: conversationId,
+            repliesCount: msg.replies?.length || 0
+        });
+    };
+
+    const formatDateSeparator = (date: Date | string) => {
+        return format(new Date(date), "d MMMM yyyy", { locale: fr });
+    };
+
+    const groupMessages = (msgs: any[]) => {
+        const groups: { date: Date, messages: any[] }[] = [];
+        if (!msgs) return [];
+        msgs.forEach((msg) => {
+            const dateVal = msg.time || msg.createdAt;
+            if (!dateVal) return;
+
+            const date = new Date(dateVal);
+            if (isNaN(date.getTime())) return;
+
+            date.setHours(0, 0, 0, 0);
+
+            let group = groups.find(g => {
+                const gDate = new Date(g.date);
+                gDate.setHours(0, 0, 0, 0);
+                return gDate.getTime() === date.getTime();
+            });
+
+            if (!group) {
+                group = { date: date, messages: [] };
+                groups.push(group);
+            }
+            group.messages.push(msg);
+        });
+        return groups;
+    };
+
+    return (
+        <div className="flex h-full w-full overflow-hidden bg-white dark:bg-zinc-900">
+            <div className="flex flex-col flex-1 h-full w-full relative min-w-0">
+                <AdvancedChatSearch
+                    isOpen={isSearching}
+                    onClose={() => {
+                        setIsSearching(false);
+                        setSearchResults([]);
+                    }}
+                    onSearch={handleSearch}
+                    initialQuery={searchQuery}
                 />
+                {/* Header */}
+                <div className="h-16 px-4 flex items-center justify-between bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800/50 sticky top-0 z-30 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <Link href="/messages" className="md:hidden p-2 -ml-2 mr-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                            <ArrowLeft size={20} />
+                        </Link>
+                        <Avatar className="h-10 w-10 border border-zinc-200 dark:border-zinc-700 ring-2 ring-transparent hover:ring-orange-100 dark:hover:ring-orange-900/20 transition-all cursor-pointer">
+                            <AvatarImage src={display.avatar} />
+                            <AvatarFallback className={cn("text-orange-600 dark:text-orange-400", (display.isGroup || isChannel) ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-orange-50 dark:bg-orange-900/20")}>
+                                {isChannel ? (display.type === "CHANNEL_PRIVATE" ? <Lock size={18} /> : <Hash size={18} />) :
+                                    display.isGroup ? <Users size={18} /> :
+                                        display.name?.[0]?.toUpperCase()}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col cursor-pointer">
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-none hover:underline">{display.name}</span>
+                            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1 line-clamp-1 max-w-[200px]">
+                                {display.isOnline && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
+                                <span className={display.isOnline ? "text-green-600 dark:text-green-400 font-semibold" : ""}>{display.status}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-zinc-400">
+                        {(display.isGroup || isChannel) && (
+                            <GroupSettings
+                                conversation={conversation}
+                                currentUserId={session?.user?.id || ""}
+                                currentUserRole={conversation.participants.find((p: any) => p.userId === session?.user?.id)?.role || "MEMBER"}
+                                onUpdate={async (data) => {
+                                    await updateGroupInfo(conversationId, data);
+                                    setConversation((prev: any) => ({ ...prev, ...data }));
+                                }}
+                                onLeave={async () => {
+                                    if (!session?.user?.id) return;
+                                    await removeParticipant(conversationId, session.user.id);
+                                    router.push('/messages');
+                                }}
+                                onPromote={async (userId) => {
+                                    if (!session?.user?.id) return;
+                                    await updateParticipantRole(conversationId, userId, "ADMIN");
+                                    // Refresh
+                                    const res = await getConversationById(conversationId, session.user.id);
+                                    if (res.success) setConversation(res.data);
+                                }}
+                                onKick={async (userId) => {
+                                    if (!session?.user?.id) return;
+                                    await removeParticipant(conversationId, userId);
+                                    // Refresh
+                                    const res = await getConversationById(conversationId, session.user.id);
+                                    if (res.success) setConversation(res.data);
+                                }}
+                            />
+                        )}
+
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" onClick={() => {
+                            if (display.isGroup) {
+                                callUser({ id: conversationId, name: display.name, avatar: display.avatar, isGroup: true, participants: conversation.participants }, false);
+                            } else if (display.id) {
+                                callUser({ id: display.id, name: display.name, avatar: display.avatar }, false);
+                            }
+                        }}><Phone size={18} /></Button>
+
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" onClick={() => {
+                            if (display.isGroup) {
+                                callUser({ id: conversationId, name: display.name, avatar: display.avatar, isGroup: true, participants: conversation.participants }, true);
+                            } else if (display.id) {
+                                callUser({ id: display.id, name: display.name, avatar: display.avatar }, true);
+                            }
+                        }}><Video size={18} /></Button>
+
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" onClick={() => setIsSearching(true)}>
+                            <Search size={18} />
+                        </Button>
+
+                        <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1" />
+
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors" onClick={() => setShowMediaSheet(true)}>
+                            <MoreVertical size={18} />
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Pinned Messages Banner */}
+                {
+                    pinnedMessages.length > 0 && !isContextView && (
+                        <div className="bg-orange-50/90 dark:bg-zinc-900/90 backdrop-blur-sm px-4 py-2 text-xs flex items-center justify-between border-b border-orange-100 dark:border-zinc-800 sticky top-[64px] md:top-0 z-20">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+                                document.getElementById(`message-${pinnedMessages[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }}>
+                                <Pin size={12} className="text-orange-500 fill-orange-500" />
+                                <span className="font-medium text-zinc-900 dark:text-zinc-200">Message épinglé:</span>
+                                <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[200px]">{pinnedMessages[0].content}</span>
+                            </div>
+                        </div>
+                    )
+                }
+
+
+                {/* Messages Area - SCROLLABLE */}
+                {/* Added pb-24 to create space for the absolute input at bottom */}
+                <div
+                    className="flex-1 overflow-y-auto p-4 pb-32 space-y-6 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent custom-scrollbar"
+                    onScroll={handleScroll}
+                >
+                    {isLoading ? (
+                        <div className="flex flex-col space-y-4 pt-4">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                                <div key={i} className={cn("flex w-full gap-3", i % 2 === 0 ? "justify-end" : "justify-start")}>
+                                    {i % 2 !== 0 && <Skeleton className="w-8 h-8 rounded-full flex-shrink-0 bg-zinc-200 dark:bg-zinc-800" />}
+                                    <div className={cn("flex flex-col gap-1 max-w-[65%]", i % 2 === 0 ? "items-end" : "items-start")}>
+                                        <Skeleton className={cn("h-10 rounded-2xl w-full", i % 2 === 0 ? "rounded-tr-none bg-orange-100/50 dark:bg-orange-500/10" : "rounded-tl-none bg-zinc-100 dark:bg-zinc-800")} style={{ width: [180, 240, 160, 220, 200][i % 5] }} />
+                                        <Skeleton className="h-3 w-12 bg-zinc-100 dark:bg-zinc-800/50" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Conversation Start Banner */}
+                            <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-50 select-none">
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-50 to-pink-50 dark:from-zinc-900 dark:to-zinc-800 flex items-center justify-center">
+                                    <Avatar className="w-20 h-20 shadow-none">
+                                        <AvatarImage src={otherParticipant?.avatar} />
+                                        <AvatarFallback className="bg-transparent text-4xl">
+                                            {conversationName?.[0]}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </div>
+                                <div>
+                                    <h3 className="text-zinc-900 dark:text-white font-bold text-lg">
+                                        {conversationName}
+                                    </h3>
+                                    <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto">
+                                        C'est le début de votre conversation. Soyez sympa et respectueux !
+                                    </p>
+                                </div>
+                                <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                                    {format(new Date(conversation.createdAt || new Date()), "d MMMM yyyy", { locale: fr })}
+                                </span>
+                            </div>
+
+                            {/* Messages List */}
+                            {groupMessages(messages).map((group, groupIndex) => (
+                                <div key={groupIndex} className="space-y-1">
+                                    {/* Date Separator */}
+                                    <div className="sticky top-2 z-10 flex justify-center my-4 pointer-events-none">
+                                        <span className="bg-zinc-100/80 dark:bg-zinc-800/80 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-bold text-zinc-500 dark:text-zinc-400 shadow-sm border border-white/20 dark:border-zinc-700/50">
+                                            {formatDateSeparator(group.date)}
+                                        </span>
+                                    </div>
+
+                                    {group.messages.map((msg: any, i: number) => {
+                                        const isMe = msg.senderId === currentUserId;
+                                        // Check if next message is same sender (for sequence grouping styling)
+                                        const isSequence = i < group.messages.length - 1 && group.messages[i + 1].senderId === msg.senderId;
+
+                                        return (
+                                            <div key={msg.id} id={`message-${msg.id}`} className="scroll-mt-32 rounded-lg transition-all duration-300">
+                                                <MessageItem
+                                                    message={msg}
+                                                    isMe={isMe}
+                                                    isSequence={isSequence}
+                                                    onReply={setReplyingTo}
+                                                    onPin={handlePinMessage}
+                                                    onQuoteClick={scrollToMessage}
+                                                    onThread={handleThreadOpen}
+                                                    searchQuery={searchQuery}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+
+
+
+
+                            <div ref={messagesEndRef} />
+                        </>
+                    )}
+                </div>
+
+                {/* Input Area - FLOAT ABSOLUTELY */}
+                <div className="absolute bottom-0 left-0 right-0 z-50 pt-2 px-4 pb-4 pointer-events-none">
+                    {/* Re-enable pointer events for interactive children */}
+                    <div className="pointer-events-auto relative">
+                        {/* Scroll / Context Button */}
+                        <AnimatePresence>
+                            {(showScrollButton || isContextView) && (
+                                <motion.button
+                                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                    onClick={isContextView ? exitContextView : scrollToBottom}
+                                    className="absolute bottom-full right-0 mb-4 bg-zinc-900/90 dark:bg-zinc-800/90 text-white backdrop-blur-md p-1.5 pr-3 pl-2 rounded-full shadow-lg border border-zinc-700/50 hover:bg-zinc-800 transition-colors z-50 flex items-center gap-2 group cursor-pointer"
+                                >
+                                    <div className="bg-zinc-800 dark:bg-zinc-700 rounded-full p-1 group-hover:bg-zinc-700 transition-colors">
+                                        <ArrowLeft size={12} className="-rotate-90 text-zinc-200" />
+                                    </div>
+                                    <span className="text-[11px] font-semibold">
+                                        {isContextView ? "Retour au présent" : "Récent"}
+                                    </span>
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
+
+                        <AnimatePresence>
+                            {replyingTo && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="flex items-center justify-between px-4 py-3 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-t border-zinc-100 dark:border-zinc-800 border-l-4 border-l-orange-500 shadow-sm relative z-50 mx-4 mb-2 rounded-r-lg"
+                                >
+                                    <div className="flex flex-col overflow-hidden mr-4">
+                                        <span className="text-orange-600 font-bold text-xs flex items-center gap-1">
+                                            <Reply size={12} />
+                                            Répondre à {replyingTo.senderName}
+                                        </span>
+                                        <span className="text-zinc-600 dark:text-zinc-400 text-sm line-clamp-1 truncate mt-0.5">{replyingTo.content || (replyingTo.attachments?.length ? "📎 Pièce jointe" : "Message")}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400" onClick={() => setReplyingTo(null)}>
+                                        <X size={14} />
+                                    </Button>
+                                </motion.div>
+                            )}
+
+
+
+                            {/* Restored closing tag */}
+                        </AnimatePresence>
+
+                        <ChatInput
+                            key={conversationId}
+                            conversationId={conversationId}
+                            onSendMessage={handleSendMessage}
+                            triggerTyping={triggerTyping}
+                            replyingTo={replyingTo}
+                            setReplyingTo={setReplyingTo}
+                            typingUsers={typingUsers}
+                        />
+                    </div>
+                </div>
+                {/* Close Wrapper */}
             </div>
+
+            <SearchResultsSidebar
+                isOpen={isSearching}
+                onClose={() => setIsSearching(false)}
+                results={searchResults}
+                onJumpTo={handleJumpToMessage}
+                isLoading={isSearchLoading}
+            />
+
             {/* Shared Media Sheet */}
             <SharedMediaSheet
                 open={showMediaSheet}

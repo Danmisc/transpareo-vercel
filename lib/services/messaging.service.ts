@@ -34,8 +34,19 @@ export async function createConversation(userIds: string[], isGroup: boolean = f
                     create: userIds.map(id => ({ userId: id }))
                 }
             },
-            include: { participants: true }
+            include: {
+                participants: {
+                    include: {
+                        user: { select: { id: true, name: true, image: true, avatar: true } }
+                    }
+                }
+            }
         });
+
+        // Notify participants via Pusher so it appears in sidebar
+        await Promise.all(userIds.map(id =>
+            pusherServer.trigger(`private-user-${id}`, "conversation:new", conversation)
+        ));
 
         return { success: true, data: conversation };
     } catch (error) {
@@ -319,17 +330,20 @@ export async function sendMessage(
             }
         });
 
-        // Update conversation lastMessageAt
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: { lastMessageAt: new Date() }
-        });
+        // Parallelize Side Effects
+        await Promise.all([
+            // Update conversation lastMessageAt
+            prisma.conversation.update({
+                where: { id: conversationId },
+                data: { lastMessageAt: new Date() }
+            }),
 
-        // Trigger Pusher Event
-        await pusherServer.trigger(`private-conversation-${conversationId}`, "message:new", message);
+            // Trigger Pusher Event
+            pusherServer.trigger(`private-conversation-${conversationId}`, "message:new", message),
 
-        // Track message usage for subscription limits
-        await recordMessageSent(senderId);
+            // Track message usage for subscription limits
+            recordMessageSent(senderId)
+        ]);
 
         return { success: true, data: message };
     } catch (error) {
@@ -533,11 +547,16 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
 
 // --- GROUP MANAGEMENT ---
 
-export async function updateGroupInfo(conversationId: string, name: string) {
+export async function updateGroupInfo(conversationId: string, data: { name?: string, description?: string, image?: string, permissions?: string }) {
     try {
         await prisma.conversation.update({
             where: { id: conversationId },
-            data: { name }
+            data: {
+                ...(data.name && { name: data.name }),
+                ...(data.description && { description: data.description }),
+                ...(data.image && { image: data.image }),
+                ...(data.permissions && { permissions: data.permissions })
+            }
         });
         return { success: true };
     } catch (error) {
@@ -699,5 +718,126 @@ export async function searchUsers(query: string = "") {
     } catch (error) {
         console.error("Search users error:", error);
         return { success: false, error: "Failed to search users" };
+    }
+}
+// --- SEARCH ---
+
+export async function searchMessages(conversationId: string, query: string, options: { senderId?: string, type?: string } = {}) {
+    try {
+        const andConditions: any[] = [
+            { conversationId },
+            { isDeleted: false }
+        ];
+
+        if (options.senderId) andConditions.push({ senderId: options.senderId });
+        if (options.type) andConditions.push({ type: options.type });
+
+        const tokens = query.split(/\s+/);
+        const searchTerms: string[] = [];
+
+        tokens.forEach(token => {
+            const lowerToken = token.toLowerCase();
+            if (lowerToken.startsWith('de:')) {
+                const name = token.substring(3);
+                if (name) {
+                    andConditions.push({
+                        sender: { name: { contains: name, mode: 'insensitive' } }
+                    });
+                }
+            } else if (lowerToken === 'contient:image') {
+                andConditions.push({
+                    OR: [
+                        { type: 'image' },
+                        { type: 'IMAGE' },
+                        { type: { contains: 'img', mode: 'insensitive' } }
+                    ]
+                });
+            } else if (lowerToken === 'contient:lien') {
+                andConditions.push({
+                    content: { contains: 'http', mode: 'insensitive' }
+                });
+            } else if (lowerToken === 'contient:fichier') {
+                andConditions.push({
+                    type: { in: ['file', 'document', 'pdf', 'archive'] }
+                });
+            } else if (lowerToken.startsWith('date:')) {
+                // Basic date support? e.g. date:2025-01-20
+                // Skipping for now to avoid complexity errors.
+            } else {
+                searchTerms.push(token);
+            }
+        });
+
+        if (searchTerms.length > 0) {
+            andConditions.push({
+                content: { contains: searchTerms.join(' '), mode: 'insensitive' }
+            });
+        }
+
+        const messages = await prisma.message.findMany({
+            where: {
+                AND: andConditions
+            },
+            take: 50,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                sender: { select: { id: true, name: true, image: true, avatar: true } },
+                reactions: { include: { user: { select: { id: true, name: true } } } },
+                replyTo: { select: { id: true, content: true, sender: { select: { name: true } } } }
+            }
+        });
+
+        return { success: true, data: messages };
+
+    } catch (error) {
+        console.error("Search messages error:", error);
+        return { success: false, error: "Failed to search messages" };
+    }
+}
+export async function fetchMessageContext(conversationId: string, messageId: string) {
+    try {
+        const targetMessage = await prisma.message.findUnique({
+            where: { id: messageId },
+            select: { createdAt: true }
+        });
+
+        if (!targetMessage) return { success: false, error: "Message not found" };
+
+        const before = await prisma.message.findMany({
+            where: {
+                conversationId,
+                createdAt: { lt: targetMessage.createdAt },
+                isDeleted: false
+            },
+            take: 20,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                sender: { select: { id: true, name: true, image: true, avatar: true } },
+                reactions: { include: { user: { select: { id: true, name: true } } } },
+                replyTo: { select: { id: true, content: true, sender: { select: { name: true } } } }
+            }
+        });
+
+        const after = await prisma.message.findMany({
+            where: {
+                conversationId,
+                createdAt: { gte: targetMessage.createdAt },
+                isDeleted: false
+            },
+            take: 20,
+            orderBy: { createdAt: 'asc' },
+            include: {
+                sender: { select: { id: true, name: true, image: true, avatar: true } },
+                reactions: { include: { user: { select: { id: true, name: true } } } },
+                replyTo: { select: { id: true, content: true, sender: { select: { name: true } } } }
+            }
+        });
+
+        const combined = [...before.reverse(), ...after];
+        return { success: true, data: combined };
+
+    } catch (error) {
+        console.error("Fetch context error:", error);
+        return { success: false, error: "Failed to fetch context" };
     }
 }

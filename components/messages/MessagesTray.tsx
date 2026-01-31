@@ -15,6 +15,7 @@ import { pusherClient } from "@/lib/pusher";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface MessagesTrayProps {
     className?: string;
@@ -97,7 +98,10 @@ export function MessagesTray({ className }: MessagesTrayProps) {
         }
     };
 
+    const pathname = usePathname();
+
     if (!session?.user?.id) return null;
+    if (pathname?.startsWith("/messages")) return null;
 
     return (
         <div className={cn("fixed bottom-4 right-24 z-40", className)}>

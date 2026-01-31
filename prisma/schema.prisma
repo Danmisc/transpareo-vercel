@@ -8,36 +8,36 @@ datasource db {
 }
 
 model User {
-  id                   String                    @id @default(cuid())
-  email                String                    @unique
-  name                 String?
-  avatar               String?
-  role                 String                    @default("TENANT")
-  password             String?
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
-  emailVerified        DateTime?
-  image                String?
-  bio                  String?
-  location             String?
-  website              String?
-  coverImage           String?
-  links                String?
-  lastActive           DateTime?                 @default(now())
-  
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatar        String?
+  role          String    @default("TENANT")
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  emailVerified DateTime?
+  image         String?
+  bio           String?
+  location      String?
+  website       String?
+  coverImage    String?
+  links         String?
+  lastActive    DateTime? @default(now())
+
   // --- REAL ESTATE PROFILE ---
-  pronouns             String?
-  siren                String?
-  languages            String?   // JSON string or comma separated
-  calendlyUrl          String?
-  whatsapp             String?
-  experienceYears      Int?
-  dealsCount           Int?
+  pronouns              String?
+  siren                 String?
+  languages             String? // JSON string or comma separated
+  calendlyUrl           String?
+  whatsapp              String?
+  experienceYears       Int?
+  dealsCount            Int?
   assetsUnderManagement String?
-  specialities         String?   // JSON string or comma separated
-  currentStatus        String?   // "OPEN_TO_WORK", "HIRING", "INVESTING", etc.
-  companyWebsite       String?
-  avatarDecoration     String?   // CSS class or identifier for avatar frame
+  specialities          String? // JSON string or comma separated
+  currentStatus         String? // "OPEN_TO_WORK", "HIRING", "INVESTING", etc.
+  companyWebsite        String?
+  avatarDecoration      String? // CSS class or identifier for avatar frame
   // ---------------------------
 
   statusMessage        String?
@@ -133,30 +133,37 @@ model User {
   vibeReviews          VibeReview[]
   wallet               Wallet?
   walletNotifications  WalletNotification[]      @relation("WalletNotifications")
-  
+
   // My Pitch / Video Bio
-  pitchVideoUrl        String?
-  pitchVideoThumbnail  String?
-  pitchDuration        Float?
-  experiences          UserExperience[]
-  searchCriteria       UserSearchCriteria?
+  pitchVideoUrl       String?
+  pitchVideoThumbnail String?
+  pitchDuration       Float?
+  experiences         UserExperience[]
+  searchCriteria      UserSearchCriteria?
+
+  // Moderation
+  bannedUsers          CommunityBannedUser[]    @relation("BannedBy")
+  receivedBans         CommunityBannedUser[]
+  moderationLogs       CommunityModerationLog[]
+  CommunityJoinRequest CommunityJoinRequest[]
+  CommunityInvitation  CommunityInvitation[]
 }
 
 model UserSearchCriteria {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  isActive    Boolean  @default(false)
-  type        String   @default("BUY") // BUY, RENT, INVEST
-  minBudget   Float?
-  maxBudget   Float?
-  minSurface  Float?
-  maxSurface  Float?
-  location    String?
-  rooms       String?
-  assetTypes  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  isActive   Boolean  @default(false)
+  type       String   @default("BUY") // BUY, RENT, INVEST
+  minBudget  Float?
+  maxBudget  Float?
+  minSurface Float?
+  maxSurface Float?
+  location   String?
+  rooms      String?
+  assetTypes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PortfolioItem {
@@ -442,15 +449,17 @@ model Notification {
 }
 
 model Report {
-  id         String   @id @default(cuid())
-  reason     String
-  details    String?
-  status     String   @default("PENDING")
-  createdAt  DateTime @default(now())
-  reporterId String?
-  targetType String
-  targetId   String
-  reporter   User?    @relation("Reporter", fields: [reporterId], references: [id])
+  id          String     @id @default(cuid())
+  reason      String
+  details     String?
+  status      String     @default("PENDING")
+  createdAt   DateTime   @default(now())
+  reporterId  String?
+  targetType  String // POST, COMMENT, USER
+  targetId    String
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id])
+  reporter    User?      @relation("Reporter", fields: [reporterId], references: [id])
 }
 
 model NotificationSettings {
@@ -503,6 +512,74 @@ model Community {
   members     CommunityMember[]
   posts       Post[]
   vibeReviews VibeReview[]
+
+  // Advanced Community Features
+  theme    String? // JSON string for branding (colors, styles)
+  settings String? // JSON string for comprehensive settings
+
+  joinRequestsEnabled Boolean @default(false)
+
+  roles          CommunityRole[]
+  invitations    CommunityInvitation[]
+  joinRequests   CommunityJoinRequest[]
+  moderationLogs CommunityModerationLog[]
+  bannedUsers    CommunityBannedUser[]
+  reports        Report[]
+}
+
+model CommunityRole {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#000000")
+  icon        String?
+  communityId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Permissions
+  canManageMembers Boolean @default(false)
+  canManageRoles   Boolean @default(false)
+  canManagePosts   Boolean @default(false)
+  canManageInvites Boolean @default(false)
+  canViewAnalytics Boolean @default(false)
+  canPinPosts      Boolean @default(false)
+  isDefault        Boolean @default(false)
+
+  community Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  members   CommunityMember[]
+
+  @@unique([communityId, name])
+}
+
+model CommunityInvitation {
+  id          String    @id @default(cuid())
+  communityId String
+  inviterId   String
+  code        String    @unique
+  maxUses     Int       @default(1)
+  uses        Int       @default(0)
+  expiresAt   DateTime?
+  roleId      String?   // Role to assign upon join
+  createdAt   DateTime  @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  inviter   User      @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+}
+
+model CommunityJoinRequest {
+  id          String   @id @default(cuid())
+  communityId String
+  userId      String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  message     String?  // User's message to mods
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
 }
 
 model VibeReview {
@@ -521,13 +598,16 @@ model VibeReview {
 }
 
 model CommunityMember {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   communityId String
   userId      String
-  role        String    @default("MEMBER")
-  joinedAt    DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  role        String   @default("MEMBER") // Basic fallback role
+  roleId      String? // Link to custom role
+  joinedAt    DateTime @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community  Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  customRole CommunityRole? @relation(fields: [roleId], references: [id])
 
   @@unique([communityId, userId])
 }
@@ -694,6 +774,9 @@ model Message {
   attachments    MessageAttachment[]
   reactions      MessageReaction[]
   readStatuses   MessageReadStatus[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
 
 model MessageAttachment {
@@ -1946,11 +2029,11 @@ model EmailVerificationToken {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   email     String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   usedAt    DateTime? // Track when token was used (for audit)
 
   @@index([token])
@@ -1966,7 +2049,7 @@ model UserExperience {
   endDate     DateTime? // Null means "Present"
   description String?
   type        String    @default("REAL_ESTATE") // REAL_ESTATE, WORK, EDUCATION
-  logo        String?   // Optional URL or identifier
+  logo        String? // Optional URL or identifier
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1974,33 +2057,121 @@ model UserExperience {
   @@index([userId])
 }
 
-
 model UserCertification {
-  id           String    @id @default(cuid())
-  userId       String
-  name         String
-  issuer       String
-  issueDate    DateTime
-  expiryDate   DateTime?
-  credentialId String?
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  issuer        String
+  issueDate     DateTime
+  expiryDate    DateTime?
+  credentialId  String?
   credentialUrl String?
-  image        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model UserSkill {
-  id              String   @id @default(cuid())
-  userId          String
-  name            String
-  category        String   @default("PROFESSIONAL") // PROFESSIONAL, PERSONAL
-  endorsementsCount Int    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  userId            String
+  name              String
+  category          String   @default("PROFESSIONAL") // PROFESSIONAL, PERSONAL
+  endorsementsCount Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model CommunityModerationLog {
+  id          String   @id @default(cuid())
+  communityId String
+  action      String // BAN, KICK, DELETE_POST, UPDATE_SETTINGS
+  moderatorId String
+  targetId    String? // UserId or PostId depending on action
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  moderator User      @relation(fields: [moderatorId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
+}
+
+model CommunityBannedUser {
+  id          String    @id @default(cuid())
+  communityId String
+  userId      String
+  bannedAt    DateTime  @default(now())
+  bannedBy    String
+  reason      String?
+  expiresAt   DateTime? // Null for permanent
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  banner    User      @relation("BannedBy", fields: [bannedBy], references: [id])
+
+  @@unique([communityId, userId])
+}
+
+model CommunityRole {
+  id          String   @id @default(cuid())
+  communityId String
+  name        String
+  color       String   @default("#000000")
+  icon        String? // Phosphor icon name or similar (e.g. "Shield", "Star")
+  permissions String // JSON string defining granular permissions
+  position    Int      @default(0) // For hierarchy sorting
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  community           Community             @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  members             CommunityMember[]
+  CommunityInvitation CommunityInvitation[]
+
+  @@unique([communityId, name])
+  @@index([communityId])
+}
+
+model CommunityJoinRequest {
+  id          String   @id @default(cuid())
+  communityId String
+  userId      String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  message     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId, status])
+}
+
+model CommunityInvitation {
+  id          String   @id @default(cuid())
+  communityId String
+  inviterId   String
+  email       String? // For external invites
+  userId      String? // For internal invites
+  token       String   @unique
+  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  roleId      String? // Invite as specific role
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  maxUses     Int      @default(1)
+  uses        Int      @default(0)
+
+  community Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  inviter   User           @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  role      CommunityRole? @relation(fields: [roleId], references: [id])
+
+  @@index([communityId])
+  @@index([token])
 }

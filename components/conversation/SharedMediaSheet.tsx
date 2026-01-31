@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { getConversationMedia } from "@/lib/services/messaging.service";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Lightbox } from "@/components/ui/lightbox";
 
 interface SharedMediaSheetProps {
     open: boolean;
@@ -19,6 +20,8 @@ interface SharedMediaSheetProps {
 export function SharedMediaSheet({ open, onOpenChange, conversationId }: SharedMediaSheetProps) {
     const [media, setMedia] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(0);
 
     useEffect(() => {
         if (open && conversationId) {
@@ -52,8 +55,24 @@ export function SharedMediaSheet({ open, onOpenChange, conversationId }: SharedM
 
     const links = media.filter(m => m.metadata);
 
+    const lightboxItems = imagesAndVideos.flatMap(m => {
+        const items = [];
+        if (m.type === "IMAGE" && m.image) items.push({ url: m.image, type: "IMAGE" as const });
+        if (m.attachments) items.push(...m.attachments.filter((a: any) => ["IMAGE", "VIDEO"].includes(a.type)).map((a: any) => ({ url: a.url, type: a.type })));
+        return items;
+    }) as { url: string; type: "IMAGE" | "VIDEO" }[];
+
+    const openLightbox = (url: string) => {
+        const index = lightboxItems.findIndex(i => i.url === url);
+        if (index >= 0) {
+            setLightboxIndex(index);
+            setLightboxOpen(true);
+        }
+    };
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
+            <Lightbox open={lightboxOpen} onClose={() => setLightboxOpen(false)} items={lightboxItems} initialIndex={lightboxIndex} />
             <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
                 <SheetHeader className="p-6 pb-2 border-b">
                     <SheetTitle>Médias partagés</SheetTitle>
@@ -84,10 +103,15 @@ export function SharedMediaSheet({ open, onOpenChange, conversationId }: SharedM
                                     if (m.attachments) items.push(...m.attachments.filter((a: any) => ["IMAGE", "VIDEO"].includes(a.type)));
 
                                     return items.map((item, i) => (
-                                        <div key={`${m.id}-${i}`} className="aspect-square relative rounded-lg overflow-hidden bg-zinc-100 border border-zinc-200">
+                                        <div
+                                            key={`${m.id}-${i}`}
+                                            className="aspect-square relative rounded-lg overflow-hidden bg-zinc-100 border border-zinc-200 cursor-pointer hover:opacity-90 active:scale-95 transition-all"
+                                            onClick={() => openLightbox(item.url)}
+                                        >
                                             {item.type === "VIDEO" ? (
-                                                <div className="w-full h-full flex items-center justify-center bg-black">
-                                                    <Video className="text-white/50" />
+                                                <div className="w-full h-full flex items-center justify-center bg-black group relative">
+                                                    <Video className="text-white/50 w-8 h-8 relative z-10" />
+                                                    <video src={item.url} className="absolute inset-0 w-full h-full object-cover opacity-50" />
                                                 </div>
                                             ) : (
                                                 <Image
@@ -154,7 +178,15 @@ export function SharedMediaSheet({ open, onOpenChange, conversationId }: SharedM
                                                 <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{meta.description}</p>
                                                 <div className="flex items-center gap-1 mt-2">
                                                     {meta.favicon && <img src={meta.favicon} className="w-3 h-3" />}
-                                                    <span className="text-[10px] text-zinc-400">{new URL(meta.url).hostname}</span>
+                                                    <span className="text-[10px] text-zinc-400">
+                                                        {(() => {
+                                                            try {
+                                                                return new URL(meta.url).hostname;
+                                                            } catch {
+                                                                return "";
+                                                            }
+                                                        })()}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </a>
